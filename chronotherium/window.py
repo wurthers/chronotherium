@@ -1,6 +1,7 @@
 from enum import Enum
 
 from bearlibterminal import terminal as bearlib
+from clubsandwich.geom import Point, Size
 
 from logging import getLogger
 
@@ -16,8 +17,8 @@ def resource_path(relative_path):
 
 
 TITLE = "Chronotherium - 2020 7DRL"
-WINDOW_WIDTH = 30
-WINDOW_HEIGHT = 30
+WINDOW_WIDTH = 50
+WINDOW_HEIGHT = 50
 ENCODING = 'utf-8'
 SPACING = '1x1'
 FONT = resource_path('../resources/VeraMono.ttf')
@@ -28,6 +29,10 @@ FG_COLOR = 0xFF000000
 BG_COLOR = 0xFFFFFFFF
 # Option to draw UI rectangles
 RECTANGLES = False
+MAP_SIZE = Size(30, 30)
+VIEW_SIZE = Size(30, 30)
+MAP_ORIGIN = Point(10, 10)
+MAP_CENTER = Point(14, 14)
 
 
 class Color(Enum):
@@ -67,7 +72,7 @@ class Window:
         self.font_width = int(w)
 
         self.encoding = ENCODING
-        self.font = TITLE_FONT
+        self.font = FONT
         self.title_font = TITLE_FONT
         self.font_size = FONT_SIZE
         self.title = TITLE

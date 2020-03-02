@@ -2,11 +2,11 @@ from typing import List
 
 from bearlibterminal import terminal as bearlib
 
-from clubsandwich.geom import Point, Size, Rect
+from clubsandwich.geom import Rect, Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 
-from chronotherium.window import Window
+from chronotherium.window import Window, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN, MAP_CENTER
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, Player, ActorState
 from chronotherium.input import Input
@@ -118,11 +118,6 @@ class StartScene(PrintScene):
 
 class GameScene(PrintScene):
 
-    MAP_SIZE = Size(30, 30)
-    VIEW_SIZE = Size(30, 30)
-    ORIGIN = Point(0, 0)
-    CENTER = Point(15, 15)
-
     def __init__(self):
         super().__init__()
 
@@ -131,7 +126,7 @@ class GameScene(PrintScene):
             bearlib.TK_ESCAPE: self.quit
         }
 
-        self.map = Map(self.MAP_SIZE, self.VIEW_SIZE, self.ORIGIN, self.CENTER)
+        self.map = Map(MAP_SIZE, VIEW_SIZE, MAP_ORIGIN, MAP_CENTER)
 
         self.entities = []
         self.context = Context()
@@ -140,7 +135,7 @@ class GameScene(PrintScene):
 
     @property
     def relative_pos(self) -> Point:
-        return self.player.position + self.map.center
+        return self.player.relative_position + self.map.center
 
     @property
     def bounds(self) -> Rect:
@@ -159,6 +154,8 @@ class GameScene(PrintScene):
                 break
 
     def terminal_read(self, val) -> None:
+        if val in self.__input_map:
+            self.__input_map[val]()
         with self.context.translate(self.relative_pos):
             self.input.handle_key(val)
 

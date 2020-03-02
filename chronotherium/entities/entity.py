@@ -4,7 +4,6 @@ from bearlibterminal import terminal as bearlib
 
 from clubsandwich.geom import Point
 from clubsandwich.tilemap import CellOutOfBoundsError
-from clubsandwich.blt.context import BearLibTerminalContext as Context
 
 from enum import Enum
 
@@ -41,16 +40,32 @@ class Entity:
         self.map = map
 
     @property
-    def position(self) -> Point:
-        return Point(self._x, self._y)
-
-    @property
     def glyph(self) -> chr:
+        """
+        Returns the glyph to use to draw this entity
+        """
         return chr(self.type.value)
 
     @property
     def tile(self):
+        """
+        Returns the cell at this entitiy's current position
+        """
         return self.map.floor.cell(self.position)
+
+    @property
+    def position(self) -> Point:
+        """
+        Returns the absolute coordinates of this entity as a Point
+        """
+        return Point(self._x, self._y)
+
+    @property
+    def relative_position(self) -> Point:
+        """
+        Returns the coordinates of this entitiy relative to the map as drawn.
+        """
+        return self.map.origin - Point(self._x, self._y)
 
     def wakeup(self, context):
         context.color(self.color)
@@ -134,7 +149,3 @@ class Player(Actor):
     @property
     def tp(self) -> int:
         return self._tp
-
-    @property
-    def position(self) -> Point:
-        return Point(self.map.origin.x + self._x, self.map.origin.y + self._y)
