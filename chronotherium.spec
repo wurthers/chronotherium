@@ -3,8 +3,8 @@
 block_cipher = None
 
 
-a = Analysis(['src/main.py'],
-             pathex=['/home/wurthers/chronotherium/src/'],
+a = Analysis(['chronotherium/main.py'],
+             pathex=['./chronotherium'],
              datas=[],
              hiddenimports=[],
              hookspath=[],
