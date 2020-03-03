@@ -25,14 +25,22 @@ class Orientation(Enum):
 
 
 class Tile(Cell, ABC):
-    def __init__(self, point: Point, color=None):
+
+    COLOR = None
+    OPEN = True
+    BLOCK_SIGHT = False
+    BLOCK = False
+
+    window = Window()
+
+    def __init__(self, point: Point):
         super().__init__(point)
+        self.block = self.BLOCK
+        self.block_sight = self.BLOCK_SIGHT
+        self.color = self.COLOR if self.COLOR is not None else self.window.fg_color
+        self.open = self.OPEN
+
         self.glyph = None
-        self.block = False
-        self.block_sight = False
-        self.window = Window()
-        self.color = color if color else self.window.fg_color
-        self.open = True
         self.occupied = False
         self.occupied_by = []
 
@@ -43,34 +51,44 @@ class Tile(Cell, ABC):
 
 
 class Empty(Tile):
+
+    OPEN = False
+    BLOCK = True
+
     def __init__(self, point):
         super().__init__(point)
-        self.open = False
         self.terrain = Terrain.EMPTY
         self.glyph = self.terrain.value
         self.block = True
 
 
-class Floor(Tile):
-    def __init__(self, point, color=None):
-        super().__init__(point, color=color)
+class FloorTile(Tile):
+    def __init__(self, point):
+        super().__init__(point)
         self.terrain = Terrain.FLOOR
         self.glyph = self.terrain.value
 
 
 class Stairs(Tile):
-    def __init__(self, point, terrain, color=None):
-        super().__init__(point, color=color)
+
+    OPEN = False
+
+    def __init__(self, point):
+        super().__init__(point)
         self.open = False
         self.terrain = Terrain.STAIRS_UP
         self.glyph = self.terrain.value
 
 
 class Wall(Tile):
-    def __init__(self, point, orientation, color=Color.TAN.value):
-        super().__init__(point, color=color)
+
+    COLOR = Color.CYAN
+    OPEN = False
+    BLOCK = True
+    BLOCK_SIGHT = True
+
+    def __init__(self, point, orientation=None):
+        super().__init__(point)
         self.open = False
-        self.terrain = orientation
+        self.terrain = orientation if orientation is not None else Orientation.VERTICAL
         self.glyph = self.terrain.value
-        self.block = True
-        self.block_sight = True

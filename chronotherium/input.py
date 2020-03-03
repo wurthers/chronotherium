@@ -5,7 +5,7 @@ from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 from clubsandwich.geom import Point
 
-from chronotherium.entities.entity import Player
+from chronotherium.entities.player import Player
 
 
 class Direction(Enum):
@@ -28,6 +28,10 @@ class Direction(Enum):
     VIM_W = bearlib.TK_H
     VIM_E = bearlib.TK_L
     VIM_WAIT = bearlib.TK_SPACE
+
+
+class Command(Enum):
+    REWIND = bearlib.TK_R
 
 
 class Input:
@@ -67,13 +71,12 @@ class Input:
 
     def handle_key(self, key):
         try:
-            direction = Direction(key)
-            self.handle_move(direction)
+            return self.handle_move(Direction(key))
         except ValueError:
             pass
 
     def handle_move(self, direction):
-        self.player.actor_move(self.__delta_map[direction])
+        return self.player.actor_move(self.__delta_map[direction])
 
     def handle_cursor(self, direction):
         return self.__delta_map[direction]

@@ -16,6 +16,25 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+class Color:
+    BASE03 = 0xFF002B36
+    BASE02 = 0xFF073642
+    BASE01 = 0xFF586E75
+    BASE00 = 0xFF657B83
+    BASE0 = 0xFF839496
+    BASE1 = 0xFF93A1A1
+    BASE2 = 0xFFEEE8D5
+    BASE3 = 0xFFFDF6E3
+    YELLOW = 0xFFB58900
+    ORANGE = 0xFFCB4B16
+    RED = 0xFFDC322F
+    MAGENTA = 0xFFD33682
+    VIOLET = 0xFF6C71C4
+    BLUE = 0xFF268BD2
+    CYAN = 0xFF2AA198
+    GREEN = 0xFF859900
+
+
 TITLE = "Chronotherium - 2020 7DRL"
 WINDOW_WIDTH = 50
 WINDOW_HEIGHT = 50
@@ -25,28 +44,13 @@ FONT = resource_path('../resources/VeraMono.ttf')
 TITLE_FONT = resource_path('../resources/CinzelDecorative-Regular.ttf')
 FONT_SIZE = '18x18'
 CELL_SIZE = '20x20'
-FG_COLOR = 0xFF000000
-BG_COLOR = 0xFFFFFFFF
+FG_COLOR = Color.BASE1
+BG_COLOR = Color.BASE03
 # Option to draw UI rectangles
 RECTANGLES = False
 MAP_SIZE = Size(30, 30)
 VIEW_SIZE = Size(30, 30)
 MAP_ORIGIN = Point(10, 10)
-MAP_CENTER = Point(14, 14)
-
-
-class Color(Enum):
-    GREEN = 0xFF557e3e
-    PURPLE = 0xFF847788
-    ORANGE = 0xFFcf8b26
-    BLUE = 0xFF525d84
-    TAN = 0xFF99886c
-    TEAL = 0xFF528480
-    MAGENTA = 0xFF845264
-    SILVER = 0xFFa1a1a1
-    BROWN = 0xFF68451d
-    RED = 0xFF52282b
-    GREY = 0xFF42525c
 
 
 class Window:

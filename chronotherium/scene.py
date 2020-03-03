@@ -6,10 +6,12 @@ from clubsandwich.geom import Rect, Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 
-from chronotherium.window import Window, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN, MAP_CENTER
+from chronotherium.window import Window, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
 from chronotherium.map import Map
-from chronotherium.entities.entity import Actor, Player, ActorState
+from chronotherium.entities.entity import Actor, ActorState
+from chronotherium.entities.player import Player
 from chronotherium.input import Input
+from chronotherium.time import Time
 
 
 class PrintScene(Scene):
@@ -118,6 +120,8 @@ class StartScene(PrintScene):
 
 class GameScene(PrintScene):
 
+    time = Time()
+
     def __init__(self):
         super().__init__()
 
@@ -126,11 +130,11 @@ class GameScene(PrintScene):
             bearlib.TK_ESCAPE: self.quit
         }
 
-        self.map = Map(MAP_SIZE, VIEW_SIZE, MAP_ORIGIN, MAP_CENTER)
+        self.map = Map(MAP_SIZE, VIEW_SIZE, MAP_ORIGIN)
 
         self.entities = []
         self.context = Context()
-        self.player = Player(self.map.center.x, self.map.center.y, self.map)
+        self.player = Player(self.map.view_center, self.map)
         self.input = Input(self.player, self.context, self)
 
     @property
@@ -153,11 +157,17 @@ class GameScene(PrintScene):
             elif key == bearlib.TK_ESCAPE:
                 break
 
+    def print_time(self):
+        corner = self.map.view_rect.point_top_right
+        clock = f'Time: {self.time.clock}'
+        self.pprint(corner.x - int(len(clock) / 2), corner.y - 1, clock)
+
     def terminal_read(self, val) -> None:
         if val in self.__input_map:
             self.__input_map[val]()
         with self.context.translate(self.relative_pos):
-            self.input.handle_key(val)
+            if self.input.handle_key(val):
+                self.time.tick()
 
     def terminal_update(self, is_active: bool = False) -> None:
         if self.player.state == ActorState.DEAD:
@@ -175,6 +185,7 @@ class GameScene(PrintScene):
                         e.on_death()
                         continue
             self.player.wakeup(self.context)
+            self.print_time()
             self.print_log()
             bearlib.refresh()
 
