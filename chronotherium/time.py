@@ -22,9 +22,9 @@ class Time:
         self._time += 1
         return self._time
 
-    @property
-    def clock(self):
-        seconds = self._time % 60
+    def clock(self, tick: int = None):
+        time = tick if tick is not None else self._time
+        seconds = time % 60
         minutes = int((self._time - seconds) / 60)
         s = ''
         return f'{minutes}:{0 if seconds < 10 else s}{seconds}'

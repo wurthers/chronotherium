@@ -6,7 +6,7 @@ from clubsandwich.geom import Rect, Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 
-from chronotherium.window import Window, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
+from chronotherium.window import Window, Color, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, ActorState
 from chronotherium.entities.player import Player
@@ -157,10 +157,20 @@ class GameScene(PrintScene):
             elif key == bearlib.TK_ESCAPE:
                 break
 
-    def print_time(self):
-        corner = self.map.view_rect.point_top_right
-        clock = f'Time: {self.time.clock}'
-        self.pprint(corner.x - int(len(clock) / 2), corner.y - 1, clock)
+    def print_time(self, tick: int = None, left_arrow: bool = False, right_arrow: bool = False):
+        corner = self.map.view_rect.point_bottom_right
+        display = f'{"<" if left_arrow else " "}Time: {self.time.clock(tick)}{">" if right_arrow else " "}'
+        self.pprint(corner.x - int(len(display) / 2), corner.y + 1, display)
+
+    def print_stats(self):
+        corner = self.map.view_rect.origin
+        hp_string = f'HP: {"|" * self.player.hp}'
+        tp_string = f'TP: {"|" * self.player.tp}'
+        bearlib.color(Color.RED)
+        self.pprint(corner.x, corner.y - 2, hp_string)
+        bearlib.color(Color.VIOLET)
+        self.pprint(corner.x, corner.y - 1, tp_string)
+        bearlib.color(self.window.fg_color)
 
     def terminal_read(self, val) -> None:
         if val in self.__input_map:
@@ -184,8 +194,9 @@ class GameScene(PrintScene):
                         self.entities.remove(e)
                         e.on_death()
                         continue
-            self.player.wakeup(self.context)
-            self.print_time()
+            self.player.draw(self.context)
+            self.print_time(right_arrow=True, left_arrow=True)
+            self.print_stats()
             self.print_log()
             bearlib.refresh()
 

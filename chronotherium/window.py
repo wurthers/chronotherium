@@ -1,5 +1,3 @@
-from enum import Enum
-
 from bearlibterminal import terminal as bearlib
 from clubsandwich.geom import Point, Size
 
@@ -36,8 +34,8 @@ class Color:
 
 
 TITLE = "Chronotherium - 2020 7DRL"
-WINDOW_WIDTH = 50
-WINDOW_HEIGHT = 50
+WINDOW_WIDTH = 30
+WINDOW_HEIGHT = 30
 ENCODING = 'utf-8'
 SPACING = '1x1'
 FONT = resource_path('../resources/VeraMono.ttf')
@@ -48,9 +46,9 @@ FG_COLOR = Color.BASE1
 BG_COLOR = Color.BASE03
 # Option to draw UI rectangles
 RECTANGLES = False
-MAP_SIZE = Size(30, 30)
-VIEW_SIZE = Size(30, 30)
-MAP_ORIGIN = Point(10, 10)
+MAP_SIZE = Size(15, 15)
+VIEW_SIZE = Size(16, 16)
+MAP_ORIGIN = Point(7, 7)
 
 
 class Window:

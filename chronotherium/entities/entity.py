@@ -6,6 +6,7 @@ from bearlibterminal import terminal as bearlib
 
 from clubsandwich.geom import Point
 from clubsandwich.tilemap import CellOutOfBoundsError
+from clubsandwich.blt.context import BearLibTerminalContext as Context
 
 from enum import Enum
 
@@ -36,6 +37,8 @@ class Entity(ABC):
     time = Time()
     logger = getLogger()
 
+    NAME: str = ""
+    DESCRIPTION: str = ""
     TYPE: EntityType = None
     COLOR: Optional[Color] = None
     BLOCKING: bool = True
@@ -79,12 +82,15 @@ class Entity(ABC):
         """
         return self.map.origin - self._pos
 
-    def wakeup(self, context):
+    def draw(self, context):
         context.color(self.color)
         context.layer(1)
         context.put(self.position, self.glyph)
         context.layer(0)
         context.color(self.window.fg_color)
+
+    def erase(self):
+        bearlib.clear(self._pos.x, self._pos.y, 1, 1)
 
     def unblock(self):
         if self.blocking:
@@ -116,12 +122,16 @@ class Actor(Entity, ABC):
             self.pos = actor.position
 
     def __init__(self, position: Point, map: Map):
-        self.ranged = False
+        self.name = self.NAME
+        self.description = self.DESCRIPTION
+        self._hp = self.BASE_HP
+        self._max_hp = self.BASE_HP
+        self._tp = self.BASE_TP
+        self._max_tp = self.BASE_TP
+
         self.state = ActorState.ALIVE
 
-        self._hp = self.BASE_HP
-        self._tp = self.BASE_TP
-
+        # Ephemeral deltas
         self.delta_hp = None
         self.delta_tp = None
         self.delta_pos = None
@@ -148,6 +158,14 @@ class Actor(Entity, ABC):
             self.delta_pos = delta
             self.turn()
             return True
+
+    @property
+    def max_hp(self):
+        return self._max_hp
+
+    @property
+    def max_tp(self):
+        return self._max_tp
 
     @property
     def hp(self) -> int:
@@ -187,11 +205,11 @@ class Actor(Entity, ABC):
     def update_pos(self):
         if self.delta_pos is not None:
             self._pos += self.delta_pos
-            bearlib.clear(self.position.x, self.position.y, 1, 1)
+            bearlib.clear(self._pos.x, self._pos.y, 1, 1)
             self.unblock()
         self.delta_pos = None
 
-    def restore_state(self, tick: int) -> None:
+    def restore_state(self, tick: int, hp=True, tp=True, pos=True) -> None:
         """
         Restores state of this entity at the given turn
         """
@@ -199,9 +217,12 @@ class Actor(Entity, ABC):
             state = self._states[tick]
         except KeyError:
             raise TimeError("No state recorded for tick {}".format(tick)) from None
-
-        self.hp = state.hp
-        self.tp = state.tp
+        if hp:
+            self._hp = state.hp
+        if tp:
+            self._tp = state.tp
+        if pos:
+            self._pos = state.pos
 
     def preview_state(self, tick: int):
         """
@@ -213,6 +234,16 @@ class Actor(Entity, ABC):
             raise TimeError("No state recorded for tick {}".format(tick)) from None
 
         return state
+
+    def draw_preview(self, context: Context, time: int):
+        state = self.preview_state(time)
+        self.erase()
+
+        context.color(self.color)
+        context.layer(1)
+        context.put(state.pos, self.glyph)
+        context.layer(0)
+        context.color(self.window.fg_color)
 
     # def change_floors(self):
     #     pass
