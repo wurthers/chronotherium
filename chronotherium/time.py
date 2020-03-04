@@ -29,6 +29,9 @@ class Time:
         s = ''
         return f'{minutes}:{0 if seconds < 10 else s}{seconds}'
 
+    def restore(self, tick: int):
+        if tick >= 0:
+            self._time = tick
 
 class TimeError(Exception):
     pass

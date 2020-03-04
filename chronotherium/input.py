@@ -95,10 +95,17 @@ class Input:
         return self.__delta_map[direction]
 
     def hurt_player(self):
-        self.player.delta_hp = -1
+        self.player.delta_hp -= 1
+        self.player.record()
         return True
 
     def rewind(self):
+        self.player.record()
+        if self.player.tp < self.player.rewind_cost:
+            self.scene.log('Not enough tp!')
+            return False
+        else:
+            self.player.delta_tp -= self.player.REWIND_COST
 
         current_tick = self.time.time
         limit = current_tick - self.player.rewind_limit
@@ -106,30 +113,42 @@ class Input:
         key = bearlib.read()
         state = None
         while key != bearlib.TK_ESCAPE:
-            bearlib.color(Color.ORANGE)
+            if key == bearlib.TK_ENTER:
+                if state is not None:
+                    self.time.restore(current_tick)
+                    self.player.restore_state(current_tick, hp=True, tp=False, pos=True)
+                return False
             try:
                 direction = Direction(key)
             except ValueError:
+                key = bearlib.read()
                 continue
             if direction in (Direction.W, Direction.VIM_W, Direction.E, Direction.VIM_E):
                 if direction in (Direction.W, Direction.VIM_W):
                     if (current_tick - 1) < limit:
+                        key = bearlib.read()
                         continue
                     try:
                         state = self.player.preview_state(current_tick - 1)
                     except TimeError:
+                        key = bearlib.read()
                         continue
                     current_tick -= 1
                 elif direction in (Direction.E, Direction.VIM_E):
+                    if (current_tick + 1) > self.time.time:
+                        key = bearlib.read()
+                        continue
                     try:
                         state = self.player.preview_state(current_tick + 1)
                     except TimeError:
+                        key = bearlib.read()
                         continue
                     current_tick += 1
 
                 if state is not None:
                     self.player.draw_preview(self.context, current_tick)
-                    self.scene.print_time(right_arrow=True, left_arrow=True)
+                    bearlib.color(Color.ORANGE)
+                    self.scene.print_time(current_tick, right_arrow=True, left_arrow=True)
 
                     bearlib.color(self.window.fg_color)
                     for cell in self.scene.map.floor.cells:
@@ -139,12 +158,6 @@ class Input:
                     self.scene.print_stats()
                     self.scene.print_log()
                     bearlib.refresh()
-
-            elif key == bearlib.TK_ENTER:
-                if state is not None:
-                    self.time.restore(current_tick)
-                    self.player.restore_state(current_tick, hp=True, tp=False, pos=True)
-                return False
 
             key = bearlib.read()
 

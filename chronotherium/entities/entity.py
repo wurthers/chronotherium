@@ -132,9 +132,9 @@ class Actor(Entity, ABC):
         self.state = ActorState.ALIVE
 
         # Ephemeral deltas
-        self.delta_hp = None
-        self.delta_tp = None
-        self.delta_pos = None
+        self.delta_hp = 0
+        self.delta_tp = 0
+        self.delta_pos = Point(0, 0)
 
         self._states = {}
 
@@ -193,21 +193,21 @@ class Actor(Entity, ABC):
         self.update_pos()
 
     def update_hp(self):
-        if self.delta_hp is not None:
+        if self.delta_hp != 0:
             self._hp += self.delta_hp
-        self.delta_hp = None
+            self.delta_hp = 0
 
     def update_tp(self):
-        if self.delta_tp is not None:
-            self.tp += self.delta_tp
-        self.delta_tp = None
+        if self.delta_tp != 0:
+            self._tp += self.delta_tp
+            self.delta_tp = 0
 
     def update_pos(self):
-        if self.delta_pos is not None:
+        if self.delta_pos != Point(0, 0):
             self._pos += self.delta_pos
             bearlib.clear(self._pos.x, self._pos.y, 1, 1)
             self.unblock()
-        self.delta_pos = None
+        self.delta_pos = Point(0, 0)
 
     def restore_state(self, tick: int, hp=True, tp=True, pos=True) -> None:
         """
