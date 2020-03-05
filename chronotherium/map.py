@@ -1,5 +1,5 @@
 from clubsandwich.geom import Point, Size, Rect
-from clubsandwich.tilemap import TileMap
+from clubsandwich.tilemap import TileMap, CellOutOfBoundsError
 
 from chronotherium.tiles.tile import Empty, FloorTile, Wall, Orientation
 
@@ -11,6 +11,7 @@ class Floor(TileMap):
         super().__init__(size, cell_class=Empty)
         self.size = size
         self.variance = variance
+        self.entities = []
 
         if self.variance != 0:
             width = randrange(self.size.width - self.variance, self.size.width + self.variance)
@@ -62,6 +63,29 @@ class Map:
         self._view_center = Point(int(self._view_size.width / 2), int(self._view_size.height / 2))
 
         self.floor = Floor(floor_size)
+
+    def populate_floor(self, enemy_density):
+        enemies = []
+        for enemy, density in enemy_density.items():
+
+            point = self.find_open_point()
+            enemies.append(enemy(point, self))
+
+        self.floor.entities.extend(enemies)
+        return enemies
+
+    def find_open_point(self):
+        while True:
+            point = self.floor.area.get_random_point()
+            try:
+                found = True
+                if self.floor.cell(point).block or not self.floor.cell(point).open:
+                    found = False
+                if found:
+                    return point
+            except CellOutOfBoundsError:
+                pass
+            continue
 
     @property
     def floor_size(self):

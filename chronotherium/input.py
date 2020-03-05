@@ -38,6 +38,12 @@ class Direction(Enum):
 class Command(Enum):
     REWIND = bearlib.TK_R
     HURT = bearlib.TK_MINUS
+    DRAIN = bearlib.TK_0
+    PUSH = bearlib.TK_P
+    DIAGONAL = bearlib.TK_E
+    FREEZE = bearlib.TK_F
+    WORMHOLE = bearlib.TK_W
+    PICKUP = bearlib.TK_COMMA
 
 
 class Input:
@@ -54,7 +60,13 @@ class Input:
 
         self.__command_map = {
             Command.REWIND: self.rewind,
-            Command.HURT: self.hurt_player
+            Command.HURT: self.hurt_player,
+            Command.DRAIN: self.drain_player,
+            Command.PUSH: self.push,
+            Command.DIAGONAL: self.diagonal,
+            Command.FREEZE: self.freeze,
+            Command.WORMHOLE: self.wormhole,
+            Command.PICKUP: self.pickup
         }
 
     __delta_map = {
@@ -97,26 +109,41 @@ class Input:
     def hurt_player(self):
         self.player.delta_hp -= 1
         self.player.record()
+        self.player.turn()
+        return True
+
+    def drain_player(self):
+        self.player.delta_tp -= 1
+        self.player.record()
+        self.player.turn()
         return True
 
     def rewind(self):
         self.player.record()
         if self.player.tp < self.player.rewind_cost:
-            self.scene.log('Not enough tp!')
+            self.scene.log('Not enough tp! This is an overly long log message!')
             return False
-        else:
-            self.player.delta_tp -= self.player.REWIND_COST
 
+        true_tick = self.time.time
         current_tick = self.time.time
         limit = current_tick - self.player.rewind_limit
 
         key = bearlib.read()
         state = None
+
+        bearlib.color(Color.ORANGE)
+        self.scene.print_time(current_tick, right_arrow=True, left_arrow=True)
+        bearlib.refresh()
+
         while key != bearlib.TK_ESCAPE:
-            if key == bearlib.TK_ENTER:
+            if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
                 if state is not None:
-                    self.time.restore(current_tick)
-                    self.player.restore_state(current_tick, hp=True, tp=False, pos=True)
+                    # Only roll back if we are on a different tick than what we started at
+                    if current_tick != true_tick:
+                        self.player.delta_tp -= self.player.rewind_cost
+                        self.time.restore(current_tick)
+                        self.player.restore_state(current_tick, hp=True, tp=False, pos=True)
+                        self.player.turn()
                 return False
             try:
                 direction = Direction(key)
@@ -155,10 +182,29 @@ class Input:
                         if self.scene.bounds.contains(cell.point + self.scene.relative_pos):
                             if not cell.occupied:
                                 cell.draw_tile(self.context)
-                    self.scene.print_stats()
+                    self.scene.print_stats(hp=state.hp)
                     self.scene.print_log()
                     bearlib.refresh()
 
             key = bearlib.read()
 
+        return False
+
+    def push(self):
+        pass
+
+    def diagonal(self):
+        pass
+
+    def freeze(self):
+        pass
+
+    def wormhole(self):
+        pass
+
+    def pickup(self):
+        items = self.map.floor.cell(self.player.position).occupied_by
+        if len(items) > 0:
+            item = items[0]
+            item.on_pickup(self.player)
         return False

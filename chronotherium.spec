@@ -5,7 +5,8 @@ block_cipher = None
 
 a = Analysis(['chronotherium/main.py'],
              pathex=['./chronotherium'],
-             datas=[],
+             binaries=[('shared/libBearLibTerminal.so', '.')],
+	     datas=[],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],

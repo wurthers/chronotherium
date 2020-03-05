@@ -34,7 +34,7 @@ class Color:
 
 
 TITLE = "Chronotherium - 2020 7DRL"
-WINDOW_WIDTH = 30
+WINDOW_WIDTH = 40
 WINDOW_HEIGHT = 30
 ENCODING = 'utf-8'
 SPACING = '1x1'
@@ -46,9 +46,9 @@ FG_COLOR = Color.BASE1
 BG_COLOR = Color.BASE03
 # Option to draw UI rectangles
 RECTANGLES = False
-MAP_SIZE = Size(15, 15)
-VIEW_SIZE = Size(16, 16)
-MAP_ORIGIN = Point(7, 7)
+MAP_SIZE = Size(18, 18)
+VIEW_SIZE = Size(18, 18)
+MAP_ORIGIN = Point(1, 7)
 
 
 class Window:

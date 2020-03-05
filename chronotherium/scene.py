@@ -10,6 +10,7 @@ from chronotherium.window import Window, Color, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, ActorState
 from chronotherium.entities.player import Player
+from chronotherium.entities.chronotherium import Chronotherium
 from chronotherium.input import Input
 from chronotherium.time import Time
 
@@ -132,7 +133,7 @@ class GameScene(PrintScene):
 
         self.map = Map(MAP_SIZE, VIEW_SIZE, MAP_ORIGIN)
 
-        self.entities = []
+        self.entities = self.map.populate_floor({Chronotherium: 1})
         self.context = Context()
         self.player = Player(self.map.view_center, self.map)
         self.input = Input(self.player, self.context, self)
@@ -162,10 +163,12 @@ class GameScene(PrintScene):
         display = f'{"<" if left_arrow else " "}Time: {self.time.clock(tick)}{">" if right_arrow else " "}'
         self.pprint(corner.x - int(len(display) / 2), corner.y + 1, display)
 
-    def print_stats(self):
+    def print_stats(self, hp: int = None, tp: int = None):
         corner = self.map.view_rect.origin
-        hp_string = f'HP: {"|" * self.player.hp}'
-        tp_string = f'TP: {"|" * self.player.tp}'
+        hp_string = f'HP: {"|" * self.player.hp if hp is None else "|" * hp}'\
+                    f'{" " * (self.player.max_hp - self.player.hp)} ({self.player.hp}/{self.player.max_hp})'
+        tp_string = f'TP: {"|" * self.player.tp if tp is None else "|" * tp}'\
+                    f'{" " * (self.player.max_tp - self.player.tp)} ({self.player.tp}/{self.player.max_tp})'
         bearlib.color(Color.RED)
         self.pprint(corner.x, corner.y - 2, hp_string)
         bearlib.color(Color.VIOLET)
@@ -182,18 +185,22 @@ class GameScene(PrintScene):
     def terminal_update(self, is_active: bool = False) -> None:
         if self.player.state == ActorState.DEAD:
             self.director.replace_scene(DeathScene())
+        elif self.player.state == ActorState.VICTORIOUS:
+            self.director.replace_scene(VictoryScene())
         bearlib.clear()
         with self.context.translate(self.relative_pos):
             for cell in self.map.floor.cells:
                 if self.bounds.contains(cell.point + self.relative_pos):
                     if not cell.occupied:
                         cell.draw_tile(self.context)
-            for e in self.entities:
-                if isinstance(e, Actor):
-                    if e.state == ActorState.DEAD:
-                        self.entities.remove(e)
-                        e.on_death()
+            for entity in self.entities:
+                if isinstance(entity, Actor):
+                    if entity.state == ActorState.DEAD:
+                        self.entities.remove(entity)
+                        entity.on_death()
                         continue
+                if self.bounds.contains(entity.position + self.relative_pos):
+                    entity.draw(self.context)
             self.player.draw(self.context)
             self.print_time(right_arrow=True, left_arrow=True)
             self.print_stats()
@@ -203,7 +210,7 @@ class GameScene(PrintScene):
 
 class DeathScene(PrintScene):
     def terminal_update(self, is_active=False):
-        self.pprint_center(["You died.", "R - Restart", "Q, ESC - Quit"])
+        self.pprint_center(["You died, lost to the winds of time.", "R - Restart", "Q, ESC - Quit"])
 
     def terminal_read(self, val):
         if val == bearlib.TK_R:
@@ -214,7 +221,8 @@ class DeathScene(PrintScene):
 
 class VictoryScene(PrintScene):
     def terminal_update(self, is_active=False):
-        self.pprint_center(["You have slain the time beast!", "R - Restart", "Q, ESC - Quit"])
+        self.pprint_center(["You have slain the time beast!", "The golden hourglass is yours!!!",
+                            "R - Restart", "Q, ESC - Quit"])
 
     def terminal_read(self, val):
         if val == bearlib.TK_R:

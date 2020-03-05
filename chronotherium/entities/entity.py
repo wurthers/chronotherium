@@ -1,6 +1,6 @@
 from abc import ABC
 from logging import getLogger
-from typing import Optional
+from typing import Optional, Union
 
 from bearlibterminal import terminal as bearlib
 
@@ -13,11 +13,13 @@ from enum import Enum
 from chronotherium.window import Window, Color
 from chronotherium.map import Map
 from chronotherium.time import Time, TimeError
+from chronotherium.rand import d6
 
 
 class ActorState(Enum):
     ALIVE = 'alive'
     DEAD = 'dead'
+    VICTORIOUS = 'victorious'
 
 
 class EnemyMode(Enum):
@@ -27,9 +29,21 @@ class EnemyMode(Enum):
 
 
 class EntityType(Enum):
+    PLAYER = 0
+    ENEMY = 1
+    ITEM = 2
+
+
+class ActorType(Enum):
     PLAYER = 0x0040     # @
-    ENEMY = 0x003F      # ?
     BEAST = 0x0043      # C
+    GOLEM = 0x0038      # 8
+    KNIGHT = 0x004B     # K
+
+
+class ItemType(Enum):
+    POTION = 0x0021     # !
+    HOURGLASS = 0x231B  # ⌛
 
 
 class Entity(ABC):
@@ -39,7 +53,8 @@ class Entity(ABC):
 
     NAME: str = ""
     DESCRIPTION: str = ""
-    TYPE: EntityType = None
+    ENTITY_TYPE: EntityType = None
+    GLYPH: Union[ActorType, ItemType] = None
     COLOR: Optional[Color] = None
     BLOCKING: bool = True
 
@@ -49,17 +64,19 @@ class Entity(ABC):
         self.window = Window()
         self.map = map
 
-        self.type = self.TYPE
+        self.type = self.ENTITY_TYPE
+        self._glyph = self.GLYPH
         self.color = self.COLOR if self.COLOR is not None else self.window.fg_color
         self.blocking = self.BLOCKING
         self.state = ActorState.ALIVE
+        self.update_block()
 
     @property
     def glyph(self) -> chr:
         """
         Returns the glyph to use to draw this entity
         """
-        return chr(self.type.value)
+        return chr(self._glyph.value)
 
     @property
     def tile(self):
@@ -103,8 +120,6 @@ class Entity(ABC):
     def update_block(self):
         if self.blocking:
             self.tile.block = True
-            if not isinstance(self, Actor):
-                self.tile.block_sight = True
         self.tile.occupied = True
         self.tile.occupied_by.append(self)
 
@@ -145,17 +160,18 @@ class Actor(Entity, ABC):
             target_point = self._pos + delta
             dest_cell = self.map.floor.cell(target_point)
             if dest_cell.occupied:
-                for e in dest_cell.occupied_by:
-                    if self.type == EntityType.PLAYER and e.type == EntityType.ENEMY:
-                        self.melee_attack(e)
-                    if self.type == EntityType.ENEMY and e.type == EntityType.PLAYER:
-                        self.melee_attack(e)
+                for entity in dest_cell.occupied_by:
+                    if self.type == EntityType.PLAYER and entity.type == EntityType.ENEMY:
+                        self.bump(entity)
+                    if self.type == EntityType.ENEMY and entity.type == EntityType.PLAYER:
+                        self.bump(entity)
             if dest_cell.block:
                 return False
         except CellOutOfBoundsError:
             return False
         else:
             self.delta_pos = delta
+            self.unblock()
             self.turn()
             return True
 
@@ -191,15 +207,20 @@ class Actor(Entity, ABC):
         self.update_hp()
         self.update_tp()
         self.update_pos()
+        self.update_block()
 
     def update_hp(self):
         if self.delta_hp != 0:
-            self._hp += self.delta_hp
+            if self.hp + self.delta_hp >= 0:
+                self._hp += self.delta_hp
             self.delta_hp = 0
+            if self.hp == 0:
+                self.state = ActorState.DEAD
 
     def update_tp(self):
         if self.delta_tp != 0:
-            self._tp += self.delta_tp
+            if self.tp + self.delta_tp >= 0:
+                self._tp += self.delta_tp
             self.delta_tp = 0
 
     def update_pos(self):
@@ -248,17 +269,22 @@ class Actor(Entity, ABC):
     # def change_floors(self):
     #     pass
 
-    # def suffer(self):
-    #     pass
-
-    # def ai_behavior(self, player):
-    #     pass
-
-    def melee_attack(self, target):
-        pass
-
-    # def ranged_attack(self, target_cell):
-    #     pass
+    def bump(self, target):
+        if d6():
+            target.delta_hp += 1
 
     def on_death(self):
         pass
+
+
+class Enemy(Actor, ABC):
+
+    TYPE = EntityType.ENEMY
+    DROP = None
+
+    def __init__(self, position, map):
+        super().__init__(position, map)
+        self.drop = self.DROP
+
+    def ai_behavior(self, player):
+        raise NotImplementedError('Enemy must have AI implemented!')
