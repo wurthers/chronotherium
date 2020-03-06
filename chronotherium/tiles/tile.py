@@ -38,7 +38,7 @@ class Tile(Cell, ABC):
         self._block = self.BLOCK
         self._block_sight = self.BLOCK_SIGHT
         self.color = self.COLOR if self.COLOR is not None else self.window.fg_color
-        self.open = self.OPEN
+        self._open = self.OPEN
 
         self.glyph = None
         self.occupied_by = []
@@ -55,6 +55,11 @@ class Tile(Cell, ABC):
     @property
     def occupied(self):
         return len(self.occupied_by) > 0
+
+    @property
+    def open(self):
+        return self._open or self.block
+    
 
 
 class Empty(Tile):
@@ -94,6 +99,5 @@ class Wall(Tile):
 
     def __init__(self, point, orientation=None):
         super().__init__(point)
-        self.open = False
         self.terrain = orientation if orientation is not None else Orientation.VERTICAL
         self.glyph = self.terrain.value

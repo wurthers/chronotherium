@@ -227,19 +227,23 @@ class Input:
             if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
                 target_tile = self.scene.map.floor.cell(target_square)
                 if not target_tile.occupied:
+                    self.scene.log("There's nothing there to freeze.")
                     return False
                 else:
                     enemy = None
                     for entity in target_tile.occupied_by:
                         if entity.type == EntityType.ENEMY:
-                            enemy - entity
+                            enemy = entity
                             break
                     if enemy is not None:
                         self.player.delta_tp -= self.player.freeze_cost
                         turns = randrange(1, 2)
-                        enemy.freeze(turns)
+                        # +1 -- Account for this current turn
+                        enemy.freeze(turns + 1)
+                        self.scene.log(f'You freeze the {enemy.name} in suspended animation.')
                         return True
                     else:
+                        self.scene.log("There's nothing there to freeze.")
                         return False
             try:
                 direction = Direction(key)
@@ -247,13 +251,22 @@ class Input:
                 key = bearlib.read()
                 continue
 
+            # Clears background from previous tile.
+            target_tile = self.scene.map.floor.cell(target_square)
+            bearlib.bkcolor(self.window.bg_color)
+            target_tile.draw_tile(self.context)
+
             delta = self.__delta_map[direction]
             target_square = self.player.position + delta
+            target_tile = self.scene.map.floor.cell(target_square)
             bearlib.bkcolor(Color.BLUE)
-            self.scene.map.floor.cell(target_square).draw_tile(self.context)
+            target_tile.draw_tile(self.context)
+            for entity in target_tile.occupied_by:
+                entity.draw(self.context)
+            bearlib.bkcolor(self.window.bg_color)
             bearlib.refresh()
 
-            bearlib.read()
+            key = bearlib.read()
 
 
     def push(self):

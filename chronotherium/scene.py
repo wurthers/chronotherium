@@ -198,6 +198,8 @@ class GameScene(PrintScene):
             self.__input_map[val]()
         with self.context.translate(self.relative_pos):
             if self.input.handle_key(val):
+                for entity in self.entities:
+                    entity.ai_behavior()
                 self.time.tick()
 
     def terminal_update(self, is_active: bool = False) -> None:
@@ -213,7 +215,6 @@ class GameScene(PrintScene):
                     if entity.state == ActorState.DEAD:
                         self.entities.remove(entity)
                         continue
-                    entity.ai_behavior()
                 if self.bounds.contains(entity.position + self.relative_pos):
                     entity.draw(self.context)
             self.player.draw(self.context)

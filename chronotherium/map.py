@@ -80,7 +80,20 @@ class Map:
         self.floor.entities.extend(enemies)
         return enemies
 
-    def find_open_point(self):
+    def closest_open_point(self, point: Point) -> Point:
+        neighbors = point.neighbors
+        found = None
+        for neighbor in neighbors:
+            if self.floor.cell(neighbor).open:
+                found = neighbor
+        if found is None:
+            for neighbor in neighbors:
+                found = self.closest_open_point(neighbor)
+                if found is not None:
+                    return found
+        return found
+
+    def find_open_point(self) -> Point:
         while True:
             point = self.floor.area.get_random_point()
             try:

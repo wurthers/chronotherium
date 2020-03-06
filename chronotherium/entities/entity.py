@@ -60,6 +60,7 @@ class Entity(ABC):
     GLYPH: Union[ActorType, ItemType] = None
     COLOR: Optional[Color] = None
     BLOCKING: bool = True
+    LAYER: int = 1
 
     def __init__(self, position: Point, map: Map, scene: 'GameScene'):
         self._pos = position
@@ -67,6 +68,7 @@ class Entity(ABC):
         self.window = Window()
         self.map = map
         self.scene = scene
+        self.layer = self.LAYER
 
         self.type = self.TYPE
         self._glyph = self.GLYPH
@@ -105,7 +107,7 @@ class Entity(ABC):
 
     def draw(self, context):
         context.color(self.color)
-        context.layer(1)
+        context.layer(self.layer)
         context.put(self.position, self.glyph)
         context.layer(0)
         context.color(self.window.fg_color)
@@ -126,6 +128,7 @@ class Actor(Entity, ABC):
 
     BASE_HP = 0
     BASE_TP = 0
+    LAYER = 2
 
     class State:
 
@@ -233,10 +236,15 @@ class Actor(Entity, ABC):
     def update_pos(self):
         if self.delta_pos != Point(0, 0):
             self.unblock()
-            if self.frozen == 0:
+            if self.frozen <= 0:
                 self._pos += self.delta_pos
+                self.frozen = 0
             else:
                 self.frozen -= 1
+                if self.frozen == 0:
+                    self.scene.log(f'The {self.name} thaws.')
+                else:
+                    self.scene.log(f'The {self.name} is stuck in time.')
             bearlib.clear(self._pos.x, self._pos.y, 1, 1)
             self.update_block()
         self.delta_pos = Point(0, 0)
@@ -258,6 +266,9 @@ class Actor(Entity, ABC):
         if tp:
             self._tp = state.tp
         if pos:
+            if not self.map.floor.cell(state.pos).open:
+                state.pos = self.map.closest_open_point(state.pos)
+                self.scene.log(f'You were displaced!')
             self._pos = state.pos
 
     def preview_state(self, tick: int):
@@ -298,7 +309,7 @@ class Actor(Entity, ABC):
         self.turn()
         return True
 
-    def freeze_self(self, turns):
+    def freeze(self, turns):
         self.frozen += turns
 
     def on_death(self):
