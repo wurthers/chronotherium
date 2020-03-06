@@ -2,6 +2,8 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from bearlibterminal import terminal as bearlib
+
+from chronotherium.entities.entity import EntityType
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.geom import Point
 
@@ -36,9 +38,12 @@ class Direction(Enum):
 
 
 class Command(Enum):
-    REWIND = bearlib.TK_R
+    # TODO: Remove these
     HURT = bearlib.TK_MINUS
     DRAIN = bearlib.TK_0
+    GAIN = bearlib.TK_KP_PLUS
+
+    REWIND = bearlib.TK_R
     PUSH = bearlib.TK_P
     DIAGONAL = bearlib.TK_E
     FREEZE = bearlib.TK_F
@@ -62,6 +67,7 @@ class Input:
             Command.REWIND: self.rewind,
             Command.HURT: self.hurt_player,
             Command.DRAIN: self.drain_player,
+            Command.GAIN: self.gain_xp,
             Command.PUSH: self.push,
             Command.DIAGONAL: self.diagonal,
             Command.FREEZE: self.freeze,
@@ -118,23 +124,33 @@ class Input:
         self.player.turn()
         return True
 
+    def gain_xp(self):
+        self.player.delta_xp += 1
+        self.player.record()
+        self.player.turn()
+        return False
+
     def rewind(self):
+        state = None
+
+        right_arrow = False
+        left_arrow = True
+
         self.player.record()
         if self.player.tp < self.player.rewind_cost:
-            self.scene.log('Not enough tp! This is an overly long log message!')
+            self.scene.log(f'Not enough tp to rewind (costs {self.player.rewind_cost} TP)')
             return False
 
         true_tick = self.time.time
         current_tick = self.time.time
         limit = current_tick - self.player.rewind_limit
 
-        key = bearlib.read()
-        state = None
-
         bearlib.color(Color.ORANGE)
-        self.scene.print_time(current_tick, right_arrow=True, left_arrow=True)
+        self.scene.print_stats(right_arrow=right_arrow, left_arrow=left_arrow)
+        self.scene.print_entities()
         bearlib.refresh()
 
+        key = bearlib.read()
         while key != bearlib.TK_ESCAPE:
             if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
                 if state is not None:
@@ -142,8 +158,10 @@ class Input:
                     if current_tick != true_tick:
                         self.player.delta_tp -= self.player.rewind_cost
                         self.time.restore(current_tick)
+                        self.player.unblock()
                         self.player.restore_state(current_tick, hp=True, tp=False, pos=True)
                         self.player.turn()
+                        self.player.update_block()
                 return False
             try:
                 direction = Direction(key)
@@ -173,16 +191,23 @@ class Input:
                     current_tick += 1
 
                 if state is not None:
+                    if current_tick == limit:
+                        left_arrow = False
+                        right_arrow = True
+                    elif current_tick == true_tick:
+                        right_arrow = False
+                        left_arrow = True
+                    else:
+                        right_arrow = True
+                        left_arrow = True
+
                     self.player.draw_preview(self.context, current_tick)
                     bearlib.color(Color.ORANGE)
-                    self.scene.print_time(current_tick, right_arrow=True, left_arrow=True)
+                    self.scene.print_stats(hp=state.hp, tick=current_tick, right_arrow=right_arrow,
+                                           left_arrow=left_arrow)
 
                     bearlib.color(self.window.fg_color)
-                    for cell in self.scene.map.floor.cells:
-                        if self.scene.bounds.contains(cell.point + self.scene.relative_pos):
-                            if not cell.occupied:
-                                cell.draw_tile(self.context)
-                    self.scene.print_stats(hp=state.hp)
+                    self.scene.print_entities()
                     self.scene.print_log()
                     bearlib.refresh()
 
@@ -203,10 +228,8 @@ class Input:
         pass
 
     def pickup(self):
-        entities = self.self.player.tile.occupied_by
+        entities = self.player.tile.occupied_by
         for entity in entities:
             if entity.type == EntityType.ITEM:
-                entity.on_pickup(self.player)
-                entity.unblock()
-                self.scene.entities.remove(e)
+                entity.on_pickup()
         return False

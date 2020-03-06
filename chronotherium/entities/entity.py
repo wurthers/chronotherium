@@ -1,6 +1,6 @@
 from abc import ABC
 from logging import getLogger
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 from bearlibterminal import terminal as bearlib
 
@@ -14,6 +14,9 @@ from chronotherium.window import Window, Color
 from chronotherium.map import Map
 from chronotherium.time import Time, TimeError
 from chronotherium.rand import d6
+
+if TYPE_CHECKING:
+    from chronotherium.scene import GameScene
 
 
 class ActorState(Enum):
@@ -43,7 +46,7 @@ class ActorType(Enum):
 
 class ItemType(Enum):
     POTION = 0x0021     # !
-    HOURGLASS = 0x231B  # ⌛
+    HOURGLASS = 0xE000  # ⌛
 
 
 class Entity(ABC):
@@ -53,18 +56,20 @@ class Entity(ABC):
 
     NAME: str = ""
     DESCRIPTION: str = ""
-    ENTITY_TYPE: EntityType = None
+    TYPE: EntityType = None
     GLYPH: Union[ActorType, ItemType] = None
     COLOR: Optional[Color] = None
     BLOCKING: bool = True
 
-    def __init__(self, position: Point, map: Map):
+    def __init__(self, position: Point, map: Map, scene: 'GameScene'):
         self._pos = position
 
         self.window = Window()
         self.map = map
+        self.scene = scene
+        self.scene.entities.append(self)
 
-        self.type = self.ENTITY_TYPE
+        self.type = self.TYPE
         self._glyph = self.GLYPH
         self.color = self.COLOR if self.COLOR is not None else self.window.fg_color
         self.blocking = self.BLOCKING
@@ -110,18 +115,12 @@ class Entity(ABC):
         bearlib.clear(self._pos.x, self._pos.y, 1, 1)
 
     def unblock(self):
-        if self.blocking:
-            self.tile.block = False
-        if self in self.tile.occupied_by:
-            if len(self.tile.occupied_by) == 1:
-                self.tile.occupied = False
+        if self.blocking and self in self.tile.occupied_by:
             self.tile.occupied_by.remove(self)
 
     def update_block(self):
-        if self.blocking:
-            self.tile.block = True
-        self.tile.occupied = True
-        self.tile.occupied_by.append(self)
+        if self not in self.tile.occupied_by:
+            self.tile.occupied_by.append(self)
 
 
 class Actor(Entity, ABC):
@@ -136,13 +135,14 @@ class Actor(Entity, ABC):
             self.tp = actor.tp
             self.pos = actor.position
 
-    def __init__(self, position: Point, map: Map):
+    def __init__(self, position: Point, map: Map, scene: 'GameScene'):
         self.name = self.NAME
         self.description = self.DESCRIPTION
         self._hp = self.BASE_HP
         self._max_hp = self.BASE_HP
         self._tp = self.BASE_TP
         self._max_tp = self.BASE_TP
+        self._xp = 0
 
         self.state = ActorState.ALIVE
 
@@ -150,30 +150,31 @@ class Actor(Entity, ABC):
         self.delta_hp = 0
         self.delta_tp = 0
         self.delta_pos = Point(0, 0)
+        self.delta_xp = 0
 
         self._states = {}
 
-        super().__init__(position, map)
+        super().__init__(position, map, scene)
 
     def actor_move(self, delta: Point):
         try:
             target_point = self._pos + delta
             dest_cell = self.map.floor.cell(target_point)
-            if dest_cell.occupied:
+            if dest_cell.block and dest_cell.occupied:
                 for entity in dest_cell.occupied_by:
                     if self.type == EntityType.PLAYER and entity.type == EntityType.ENEMY:
                         return self.bump(entity)
                     if self.type == EntityType.ENEMY and entity.type == EntityType.PLAYER:
                         self.bump(entity)
-            if dest_cell.block:
+            elif dest_cell.block:
                 return False
+            else:
+                self.delta_pos = delta
+                self.unblock()
+                self.turn()
+                return True
         except CellOutOfBoundsError:
             return False
-        else:
-            self.delta_pos = delta
-            self.unblock()
-            self.turn()
-            return True
 
     @property
     def max_hp(self):
@@ -192,6 +193,10 @@ class Actor(Entity, ABC):
         return self._tp
 
     @property
+    def xp(self):
+        return self._xp
+
+    @property
     def states(self):
         return self._states
 
@@ -207,15 +212,17 @@ class Actor(Entity, ABC):
         self.update_hp()
         self.update_tp()
         self.update_pos()
-        self.update_block()
+        self.update_xp()
+        if self.state == ActorState.DEAD:
+            self.on_death()
 
     def update_hp(self):
         if self.delta_hp != 0:
             if self.hp + self.delta_hp >= 0:
                 self._hp += self.delta_hp
-            self.delta_hp = 0
             if self.hp == 0:
                 self.state = ActorState.DEAD
+        self.delta_hp = 0
 
     def update_tp(self):
         if self.delta_tp != 0:
@@ -225,10 +232,15 @@ class Actor(Entity, ABC):
 
     def update_pos(self):
         if self.delta_pos != Point(0, 0):
+            self.unblock()
             self._pos += self.delta_pos
             bearlib.clear(self._pos.x, self._pos.y, 1, 1)
-            self.unblock()
+            self.update_block()
         self.delta_pos = Point(0, 0)
+
+    def update_xp(self):
+        self._xp += self.delta_xp
+        self.delta_xp = 0
 
     def restore_state(self, tick: int, hp=True, tp=True, pos=True) -> None:
         """
@@ -271,9 +283,17 @@ class Actor(Entity, ABC):
 
     def bump(self, target):
         if d6():
-            target.delta_hp += 1
-        entity.turn()
+            target.delta_hp -= 1
+            player_message = f"You use your regular meat hands to pummel the {target.name}. "\
+                             f"({target.hp + target.delta_hp}/{target.max_hp})"
+            enemy_message = f"The {self.name} bashes into you."
+        else:
+            player_message = f"You swing a fist at the the {target.name} but miss."
+            enemy_message = f"The {self.name} charges for you but you manage to dodge."
+        self.scene.log(f'{player_message if self._glyph == ActorType.PLAYER else enemy_message}')
+        target.turn()
         self.turn()
+        return True
 
     def on_death(self):
         pass
@@ -283,10 +303,22 @@ class Enemy(Actor, ABC):
 
     TYPE = EntityType.ENEMY
     DROP = None
+    XP = None
 
-    def __init__(self, position, map):
-        super().__init__(position, map)
+    def __init__(self, position, map, scene):
+        super().__init__(position, map, scene)
         self.drop = self.DROP
+        self._xp = self.XP
 
-    def ai_behavior(self, player):
+    def ai_behavior(self):
         raise NotImplementedError('Enemy must have AI implemented!')
+
+    def drop_item(self):
+        if self.drop is not None:
+            item = self.drop(self.position, self.map, self.scene)
+            item.update_block()
+
+    def on_death(self):
+        self.unblock()
+        self.drop_item()
+        self.scene.player.delta_xp += self.xp

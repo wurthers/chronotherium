@@ -35,19 +35,26 @@ class Tile(Cell, ABC):
 
     def __init__(self, point: Point):
         super().__init__(point)
-        self.block = self.BLOCK
-        self.block_sight = self.BLOCK_SIGHT
+        self._block = self.BLOCK
+        self._block_sight = self.BLOCK_SIGHT
         self.color = self.COLOR if self.COLOR is not None else self.window.fg_color
         self.open = self.OPEN
 
         self.glyph = None
-        self.occupied = False
         self.occupied_by = []
 
     def draw_tile(self, context: Context):
         context.color(self.color)
-        context.put(Point(self.point.x, self.point.y), self.glyph)
+        context.put(self.point, self.glyph)
         context.color(self.window.fg_color)
+
+    @property
+    def block(self):
+        return self._block or any(entity.blocking for entity in self.occupied_by)
+
+    @property
+    def occupied(self):
+        return len(self.occupied_by) > 0
 
 
 class Empty(Tile):
@@ -59,7 +66,6 @@ class Empty(Tile):
         super().__init__(point)
         self.terrain = Terrain.EMPTY
         self.glyph = self.terrain.value
-        self.block = True
 
 
 class FloorTile(Tile):
@@ -75,7 +81,6 @@ class Stairs(Tile):
 
     def __init__(self, point):
         super().__init__(point)
-        self.open = False
         self.terrain = Terrain.STAIRS_UP
         self.glyph = self.terrain.value
 

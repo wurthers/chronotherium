@@ -39,6 +39,10 @@ WINDOW_HEIGHT = 30
 ENCODING = 'utf-8'
 SPACING = '1x1'
 FONT = resource_path('../resources/VeraMono.ttf')
+SYMBOLA_FONT = resource_path('../resources/ttf-symbola/Symbola.ttf')
+SYMBOLA_CODEPAGE = resource_path('../resources/symbola_codepage.txt')
+HAN_FONT = resource_path('../resources/babelstone-han/BabelStoneHan.ttf')
+HAN_CODEPAGE = resource_path('../resources/han_codepage.txt')
 TITLE_FONT = resource_path('../resources/CinzelDecorative-Regular.ttf')
 FONT_SIZE = '18x18'
 CELL_SIZE = '20x20'
@@ -50,6 +54,7 @@ MAP_SIZE = Size(18, 18)
 VIEW_SIZE = Size(18, 18)
 MAP_ORIGIN = Point(1, 7)
 LOG_HEIGHT = MAP_ORIGIN.y - 3
+
 
 class Window:
 
@@ -75,13 +80,17 @@ class Window:
 
         self.encoding = ENCODING
         self.font = FONT
-        self.title_font = TITLE_FONT
         self.font_size = FONT_SIZE
+        self.symbol_font = SYMBOLA_FONT
         self.title = TITLE
         self.cell_size = CELL_SIZE
         self.spacing = SPACING
         self.fg_color = FG_COLOR
         self.bg_color = BG_COLOR
+        self.symbol_str = f'0xE000: {SYMBOLA_FONT}, size={self.font_size}, align=center, spacing={self.spacing}, '\
+                          f'codepage={SYMBOLA_CODEPAGE}; '
+        self.tally_str = f'0xE001: {HAN_FONT}, size={self.font_size}, align=center, spacing={self.spacing}, '\
+                         f'codepage={HAN_CODEPAGE}; '
         self.config_str = 'terminal: encoding={}; ' \
                           'font: {}, size={}, align=center, spacing={}; ' \
                           'window: size={} title={}, cellsize={}; ' \
@@ -100,3 +109,5 @@ class Window:
         bearlib.color(self.fg_color)
         bearlib.bkcolor(self.bg_color)
         bearlib.set(self.config_str)
+        bearlib.set(self.symbol_str)
+        bearlib.set(self.tally_str)

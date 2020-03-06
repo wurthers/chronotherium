@@ -1,9 +1,13 @@
+from typing import TYPE_CHECKING
+from random import randrange
+
 from clubsandwich.geom import Point, Size, Rect
 from clubsandwich.tilemap import TileMap, CellOutOfBoundsError
 
 from chronotherium.tiles.tile import Empty, FloorTile, Wall, Orientation
 
-from random import randrange
+if TYPE_CHECKING:
+    from chronotherium.scene import GameScene
 
 
 class Floor(TileMap):
@@ -54,7 +58,7 @@ class Floor(TileMap):
 
 class Map:
 
-    def __init__(self, floor_size: Size, view_size: Size, origin: Point):
+    def __init__(self, floor_size: Size, view_size: Size, origin: Point, scene: 'GameScene'):
         self._floor_size = floor_size
         self._origin = origin
         self._center = Point(int(self._floor_size.width / 2), int(self._floor_size.height / 2))
@@ -64,12 +68,14 @@ class Map:
 
         self.floor = Floor(floor_size)
 
+        self.scene = scene
+
     def populate_floor(self, enemy_density):
         enemies = []
         for enemy, density in enemy_density.items():
 
             point = self.find_open_point()
-            enemies.append(enemy(point, self))
+            enemies.append(enemy(point, self, self.scene))
 
         self.floor.entities.extend(enemies)
         return enemies

@@ -1,6 +1,9 @@
 from random import randrange
 
 
-def d6():
-    roll = randrange(0, 5)
-    return roll > 2
+def d6(limit=2, over=True):
+    roll = randrange(1, 6)
+    if over:
+        return roll > limit
+    else:
+        return roll < limit

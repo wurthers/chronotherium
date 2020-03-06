@@ -1,3 +1,6 @@
 [submodule "clubsandwich"]
 	path = clubsandwich
 	url = https://github.com/irskep/clubsandwich/
+[submodule "resources/ttf-symbola"]
+	path = resources/ttf-symbola
+	url = https://github.com/gearit/ttf-symbola.git

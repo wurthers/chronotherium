@@ -20,6 +20,7 @@ class PrintScene(Scene):
     def __init__(self):
         self.window = Window()
         self.message_log = []
+        self.gutter = []
         self.log_height = LOG_HEIGHT
         super().__init__()
 
@@ -125,17 +126,18 @@ class GameScene(PrintScene):
 
     def __init__(self):
         super().__init__()
+        self.entities = []
 
         self.__input_map = {
             bearlib.TK_Q: self.quit,
             bearlib.TK_ESCAPE: self.quit
         }
 
-        self.map = Map(MAP_SIZE, VIEW_SIZE, MAP_ORIGIN)
+        self.map = Map(MAP_SIZE, VIEW_SIZE, MAP_ORIGIN, self)
 
-        self.entities = self.map.populate_floor({Chronotherium: 1})
+        self.map.populate_floor({Chronotherium: 1})
         self.context = Context()
-        self.player = Player(self.map.view_center, self.map)
+        self.player = Player(self.map.view_center, self.map, self)
         self.input = Input(self.player, self.context, self)
 
     @property
@@ -158,21 +160,37 @@ class GameScene(PrintScene):
             elif key == bearlib.TK_ESCAPE:
                 break
 
-    def print_time(self, tick: int = None, left_arrow: bool = False, right_arrow: bool = False):
-        corner = self.map.view_rect.point_bottom_right
-        display = f'{"<" if left_arrow else " "}Time: {self.time.clock(tick)}{">" if right_arrow else " "}'
-        self.pprint(corner.x - int(len(display) / 2), corner.y + 1, display)
+    def print_entities(self):
+        for cell in self.map.floor.cells:
+            if self.bounds.contains(cell.point + self.relative_pos):
+                if not cell.occupied:
+                    cell.draw_tile(self.context)
 
-    def print_stats(self, hp: int = None, tp: int = None):
-        corner = self.map.view_rect.origin
-        hp_string = f'HP: {"|" * self.player.hp if hp is None else "|" * hp}'\
-                    f'{" " * (self.player.max_hp - self.player.hp)} ({self.player.hp}/{self.player.max_hp})'
-        tp_string = f'TP: {"|" * self.player.tp if tp is None else "|" * tp}'\
-                    f'{" " * (self.player.max_tp - self.player.tp)} ({self.player.tp}/{self.player.max_tp})'
+    def print_stats(self, hp: int = None, tp: int = None, tick: int = None, left_arrow: bool = False,
+                    right_arrow: bool = False):
+
+        color = bearlib.state(bearlib.TK_COLOR)
+        corner = self.map.view_rect.point_bottom_left
+        bearlib.clear_area(corner.x, corner.y + 1, self.window.width, self.window.height - corner.y + 1)
+
+        if hp is None:
+            hp = self.player.hp
+        if tp is None:
+            tp = self.player.tp
+        hp_string = f'HP: {"|" * hp}{" " * (self.player.max_hp - self.player.hp)} '\
+                    f'({self.player.hp}/{self.player.max_hp})'
+        tp_string = f'TP: {"|" * tp}{" " * (self.player.max_tp - self.player.tp)} '\
+                    f'({self.player.tp}/{self.player.max_tp})'
+        xp_string = f'XP: {self.player.xp} - Level {self.player.level}'
+        time_string = f'{"<" if left_arrow else " "}Time: {self.time.clock(tick)}{">" if right_arrow else ""}'
         bearlib.color(Color.RED)
-        self.pprint(corner.x, corner.y - 2, hp_string)
+        self.pprint(corner.x, corner.y + 1, hp_string)
         bearlib.color(Color.VIOLET)
-        self.pprint(corner.x, corner.y - 1, tp_string)
+        self.pprint(corner.x, corner.y + 2, tp_string)
+        bearlib.color(Color.YELLOW)
+        self.pprint(corner.x, corner.y + 3, xp_string)
+        bearlib.color(color)
+        self.pprint(corner.x, corner.y + 4, time_string)
         bearlib.color(self.window.fg_color)
 
     def terminal_read(self, val) -> None:
@@ -189,20 +207,15 @@ class GameScene(PrintScene):
             self.director.replace_scene(VictoryScene())
         bearlib.clear()
         with self.context.translate(self.relative_pos):
-            for cell in self.map.floor.cells:
-                if self.bounds.contains(cell.point + self.relative_pos):
-                    if not cell.occupied:
-                        cell.draw_tile(self.context)
+            self.print_entities()
             for entity in self.entities:
                 if isinstance(entity, Actor):
                     if entity.state == ActorState.DEAD:
                         self.entities.remove(entity)
-                        entity.on_death()
                         continue
                 if self.bounds.contains(entity.position + self.relative_pos):
                     entity.draw(self.context)
             self.player.draw(self.context)
-            self.print_time(right_arrow=True, left_arrow=True)
             self.print_stats()
             self.print_log()
             bearlib.refresh()
