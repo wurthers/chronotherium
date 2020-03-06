@@ -6,7 +6,7 @@ from clubsandwich.geom import Rect, Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 
-from chronotherium.window import Window, Color, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
+from chronotherium.window import Window, Color, LOG_HEIGHT, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, ActorState
 from chronotherium.entities.player import Player
@@ -20,7 +20,7 @@ class PrintScene(Scene):
     def __init__(self):
         self.window = Window()
         self.message_log = []
-        self.log_height = 4
+        self.log_height = LOG_HEIGHT
         super().__init__()
 
     def pprint(self, x: int, y: int, string: str):

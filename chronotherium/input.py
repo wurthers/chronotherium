@@ -203,8 +203,10 @@ class Input:
         pass
 
     def pickup(self):
-        items = self.map.floor.cell(self.player.position).occupied_by
-        if len(items) > 0:
-            item = items[0]
-            item.on_pickup(self.player)
+        entities = self.self.player.tile.occupied_by
+        for entity in entities:
+            if entity.type == EntityType.ITEM:
+                entity.on_pickup(self.player)
+                entity.unblock()
+                self.scene.entities.remove(e)
         return False

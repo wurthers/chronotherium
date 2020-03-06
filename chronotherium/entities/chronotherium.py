@@ -18,4 +18,4 @@ class Chronotherium(Actor):
         pass
 
     def ai_behavior(self):
-        pass
+        self.turn()

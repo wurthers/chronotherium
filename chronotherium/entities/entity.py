@@ -162,7 +162,7 @@ class Actor(Entity, ABC):
             if dest_cell.occupied:
                 for entity in dest_cell.occupied_by:
                     if self.type == EntityType.PLAYER and entity.type == EntityType.ENEMY:
-                        self.bump(entity)
+                        return self.bump(entity)
                     if self.type == EntityType.ENEMY and entity.type == EntityType.PLAYER:
                         self.bump(entity)
             if dest_cell.block:
@@ -272,6 +272,8 @@ class Actor(Entity, ABC):
     def bump(self, target):
         if d6():
             target.delta_hp += 1
+        entity.turn()
+        self.turn()
 
     def on_death(self):
         pass

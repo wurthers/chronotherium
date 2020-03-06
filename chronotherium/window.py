@@ -49,7 +49,7 @@ RECTANGLES = False
 MAP_SIZE = Size(18, 18)
 VIEW_SIZE = Size(18, 18)
 MAP_ORIGIN = Point(1, 7)
-
+LOG_HEIGHT = MAP_ORIGIN.y - 3
 
 class Window:
 
