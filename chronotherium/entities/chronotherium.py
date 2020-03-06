@@ -1,6 +1,9 @@
+from random import randrange
+
+from clubsandwich.geom import Point
+
 from chronotherium.entities.entity import Enemy, ActorType
 from chronotherium.window import Color
-
 from chronotherium.entities.items import Hourglass
 
 
@@ -16,4 +19,8 @@ class Chronotherium(Enemy):
     DROP = Hourglass
 
     def ai_behavior(self):
+        x = randrange(-1, 1)
+        y = randrange(-1, 1)
+        delta = Point(x, y)
+        self.actor_move(delta)
         self.turn()

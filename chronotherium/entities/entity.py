@@ -67,7 +67,6 @@ class Entity(ABC):
         self.window = Window()
         self.map = map
         self.scene = scene
-        self.scene.entities.append(self)
 
         self.type = self.TYPE
         self._glyph = self.GLYPH
@@ -144,6 +143,7 @@ class Actor(Entity, ABC):
         self._max_tp = self.BASE_TP
         self._xp = 0
 
+        self.frozen = 0
         self.state = ActorState.ALIVE
 
         # Ephemeral deltas
@@ -233,7 +233,10 @@ class Actor(Entity, ABC):
     def update_pos(self):
         if self.delta_pos != Point(0, 0):
             self.unblock()
-            self._pos += self.delta_pos
+            if self.frozen == 0:
+                self._pos += self.delta_pos
+            else:
+                self.frozen -= 1
             bearlib.clear(self._pos.x, self._pos.y, 1, 1)
             self.update_block()
         self.delta_pos = Point(0, 0)
@@ -295,6 +298,9 @@ class Actor(Entity, ABC):
         self.turn()
         return True
 
+    def freeze_self(self, turns):
+        self.frozen += turns
+
     def on_death(self):
         pass
 
@@ -307,9 +313,14 @@ class Enemy(Actor, ABC):
 
     def __init__(self, position, map, scene):
         super().__init__(position, map, scene)
-        self.drop = self.DROP
+        self._drop = self.DROP
         self._xp = self.XP
+        self.scene.entities.append(self)
 
+    @property
+    def drop(self):
+        return self._drop
+    
     def ai_behavior(self):
         raise NotImplementedError('Enemy must have AI implemented!')
 

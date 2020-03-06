@@ -8,6 +8,10 @@ class Item(Entity, ABC):
     TYPE = EntityType.ITEM
     BLOCKING = False
 
+    def __init__(self, position, map, scene):
+        super().__init__(position, map, scene)
+        self.scene.entities.append(self)
+
     def on_pickup(self):
         self.scene.entities.remove(self)
 

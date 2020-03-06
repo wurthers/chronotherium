@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from abc import ABC
 
 from clubsandwich.geom import Point
 
@@ -25,12 +26,20 @@ class Player(Actor):
     BASE_TP = 10
     REWIND_LIMIT = 2
     REWIND_COST = 3
+    FREEZE_COST = 1
 
     def __init__(self, position: Point, map: Map, scene: 'GameScene'):
         super().__init__(position, map, scene)
         self._rewind_limit = self.REWIND_LIMIT
         self._rewind_cost = self.REWIND_COST
+        self._freeze_cost = self.FREEZE_COST
 
+        self.__skills = {}
+
+    @property
+    def skill(self):
+        return self._skill
+    
     @property
     def max_hp(self):
         return self._max_hp + self.level * 2
@@ -43,6 +52,10 @@ class Player(Actor):
     def rewind_cost(self):
         return self._rewind_cost - int(self.level / 2)
 
+    @property
+    def freeze_cost(self):
+        return self._freeze_cost
+    
     @property
     def level(self):
         level = 0

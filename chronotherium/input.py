@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import TYPE_CHECKING
+from random import randrange
 
 from bearlibterminal import terminal as bearlib
 
@@ -8,11 +9,10 @@ from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.geom import Point
 
 from chronotherium.time import Time, TimeError
-from chronotherium.entities.player import Player
 from chronotherium.window import Window, Color
 
 if TYPE_CHECKING:
-    from chronotherium.scene import GameScene
+    from chronotherium.scene import GameScene, Player
 
 
 class Direction(Enum):
@@ -53,7 +53,7 @@ class Command(Enum):
 
 class Input:
 
-    def __init__(self, player: Player, context: Context, scene: 'GameScene'):
+    def __init__(self, player: 'Player', context: Context, scene: 'GameScene'):
         """
         Class to handle player input
         """
@@ -215,13 +215,51 @@ class Input:
 
         return False
 
+    def freeze(self):
+
+        target_square = self.player.position + Point(0, 1)
+        bearlib.bkcolor(Color.BLUE)
+        self.scene.map.floor.cell(target_square).draw_tile(self.context)
+        bearlib.refresh()
+
+        key = bearlib.read()
+        while key != bearlib.TK_ESCAPE:
+            if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
+                target_tile = self.scene.map.floor.cell(target_square)
+                if not target_tile.occupied:
+                    return False
+                else:
+                    enemy = None
+                    for entity in target_tile.occupied_by:
+                        if entity.type == EntityType.ENEMY:
+                            enemy - entity
+                            break
+                    if enemy is not None:
+                        self.player.delta_tp -= self.player.freeze_cost
+                        turns = randrange(1, 2)
+                        enemy.freeze(turns)
+                        return True
+                    else:
+                        return False
+            try:
+                direction = Direction(key)
+            except ValueError:
+                key = bearlib.read()
+                continue
+
+            delta = self.__delta_map[direction]
+            target_square = self.player.position + delta
+            bearlib.bkcolor(Color.BLUE)
+            self.scene.map.floor.cell(target_square).draw_tile(self.context)
+            bearlib.refresh()
+
+            bearlib.read()
+
+
     def push(self):
         pass
 
     def diagonal(self):
-        pass
-
-    def freeze(self):
         pass
 
     def wormhole(self):

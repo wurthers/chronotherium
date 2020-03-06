@@ -213,6 +213,7 @@ class GameScene(PrintScene):
                     if entity.state == ActorState.DEAD:
                         self.entities.remove(entity)
                         continue
+                    entity.ai_behavior()
                 if self.bounds.contains(entity.position + self.relative_pos):
                     entity.draw(self.context)
             self.player.draw(self.context)
