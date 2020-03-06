@@ -49,6 +49,7 @@ class Command(Enum):
     FREEZE = bearlib.TK_F
     WORMHOLE = bearlib.TK_W
     PICKUP = bearlib.TK_COMMA
+    PICKUP_G = bearlib.TK_G
 
 
 class Input:
@@ -72,7 +73,8 @@ class Input:
             Command.DIAGONAL: self.diagonal,
             Command.FREEZE: self.freeze,
             Command.WORMHOLE: self.wormhole,
-            Command.PICKUP: self.pickup
+            Command.PICKUP: self.pickup,
+            Command.PICKUP_G: self.pickup
         }
 
     __delta_map = {
