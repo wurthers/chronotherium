@@ -220,6 +220,7 @@ class Input:
         target_square = self.player.position + Point(0, 1)
         bearlib.bkcolor(Color.BLUE)
         self.scene.map.floor.cell(target_square).draw_tile(self.context)
+        bearlib.bkcolor(self.window.bg_color)
         bearlib.refresh()
 
         key = bearlib.read()

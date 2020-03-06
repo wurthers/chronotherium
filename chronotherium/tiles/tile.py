@@ -58,8 +58,7 @@ class Tile(Cell, ABC):
 
     @property
     def open(self):
-        return self._open or self.block
-    
+        return self._open or self.blockz    
 
 
 class Empty(Tile):

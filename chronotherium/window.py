@@ -91,16 +91,10 @@ class Window:
                           f'codepage={SYMBOLA_CODEPAGE}; '
         self.tally_str = f'0xE001: {HAN_FONT}, size={self.font_size}, align=center, spacing={self.spacing}, '\
                          f'codepage={HAN_CODEPAGE}; '
-        self.config_str = 'terminal: encoding={}; ' \
-                          'font: {}, size={}, align=center, spacing={}; ' \
-                          'window: size={} title={}, cellsize={}; ' \
-                          'input: filter=[arrow, keypad, keyboard, system]'.format(self.encoding,
-                                                                                   self.font,
-                                                                                   self.font_size,
-                                                                                   self.spacing,
-                                                                                   self.dimensions,
-                                                                                   self.title,
-                                                                                   self.cell_size)
+        self.config_str = f'terminal: encoding={self.encoding}; ' \
+                          f'font: {self.font}, size={self.font_size}, align=center, spacing={self.spacing}; ' \
+                          f'window: size={self.dimensions} title={self.title}, cellsize={self.cell_size}; ' \
+                          f'input: filter=[arrow, keypad, keyboard, system]'
         self.start()
         self.bearlib = bearlib
 

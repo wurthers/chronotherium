@@ -234,17 +234,16 @@ class Actor(Entity, ABC):
             self.delta_tp = 0
 
     def update_pos(self):
+        if self.frozen > 0:
+            self.frozen -= 1
+            self.scene.log(f'The {self.name} is stuck in time.')
+            if self.frozen == 0:
+                self.scene.log(f'The {self.name} thaws.')
+            else:
+                return
         if self.delta_pos != Point(0, 0):
             self.unblock()
-            if self.frozen <= 0:
-                self._pos += self.delta_pos
-                self.frozen = 0
-            else:
-                self.frozen -= 1
-                if self.frozen == 0:
-                    self.scene.log(f'The {self.name} thaws.')
-                else:
-                    self.scene.log(f'The {self.name} is stuck in time.')
+            self._pos += self.delta_pos
             bearlib.clear(self._pos.x, self._pos.y, 1, 1)
             self.update_block()
         self.delta_pos = Point(0, 0)
