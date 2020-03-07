@@ -13,6 +13,8 @@ class Terrain(Enum):
     EMPTY = 0x0020          # SP
     STAIRS_DOWN = 0x003E    # >
     STAIRS_UP = 0x003C      # <
+    DOOR = 0x002B           # +
+    DOOR_OPEN = 0x002D      # -
 
 
 class Orientation(Enum):
@@ -30,6 +32,7 @@ class Tile(Cell, ABC):
     OPEN = True
     BLOCK_SIGHT = False
     BLOCK = False
+    TERRAIN = None
 
     window = Window()
 
@@ -39,8 +42,8 @@ class Tile(Cell, ABC):
         self._block_sight = self.BLOCK_SIGHT
         self.color = self.COLOR if self.COLOR is not None else self.window.fg_color
         self._open = self.OPEN
+        self.terrain = self.TERRAIN
 
-        self.glyph = None
         self.entities = []
 
     def draw_tile(self, context: Context):
@@ -48,6 +51,10 @@ class Tile(Cell, ABC):
         context.put(self.point, self.glyph)
         context.color(self.window.fg_color)
 
+    @property
+    def glyph(self):
+        return self.terrain.value
+    
     @property
     def block(self):
         return self._block or any(entity.blocking for entity in self.entities)
@@ -60,33 +67,36 @@ class Tile(Cell, ABC):
     def open(self):
         return self._open or self.block
 
+    def interact(self):
+        pass
+
 
 class Empty(Tile):
 
     OPEN = False
     BLOCK = True
-
-    def __init__(self, point):
-        super().__init__(point)
-        self.terrain = Terrain.EMPTY
-        self.glyph = self.terrain.value
+    TERRAIN = Terrain.EMPTY
 
 
 class FloorTile(Tile):
-    def __init__(self, point):
-        super().__init__(point)
-        self.terrain = Terrain.FLOOR
-        self.glyph = self.terrain.value
+
+    TERRAIN = Terrain.FLOOR
 
 
-class Stairs(Tile):
+class Stairs(Tile, ABC):
 
     OPEN = False
 
-    def __init__(self, point):
-        super().__init__(point)
-        self.terrain = Terrain.STAIRS_UP
-        self.glyph = self.terrain.value
+    def interact(self):
+        pass
+
+
+class StairsUp(Stairs):
+    TERRAIN = Terrain.STAIRS_UP
+
+
+class StairsDown(Stairs):
+    TERRAIN = Terrain.STAIRS_DOWN
 
 
 class Wall(Tile):
@@ -96,7 +106,37 @@ class Wall(Tile):
     BLOCK = True
     BLOCK_SIGHT = True
 
-    def __init__(self, point, orientation=None):
+    def __init__(self, point, orientation=Orientation.VERTICAL):
         super().__init__(point)
-        self.terrain = orientation if orientation is not None else Orientation.VERTICAL
-        self.glyph = self.terrain.value
+        self.terrain = orientation
+
+
+class Door(Tile):
+
+    COLOR = Color.CYAN
+    OPEN = False
+    BLOCK = True
+    TERRAIN = Terrain.DOOR
+
+    def __init__(self, point):
+        super().__init__(point)
+        self._door_open = False
+
+    def interact(self):
+        if not self.occupied:
+            self._door_open = False if self._door_open else True
+            self._block = False if self._door_open else True
+            return True
+        return False
+
+    @property
+    def glyph(self):
+        return Terrain.DOOR_OPEN.value if self._door_open else Terrain.DOOR.value
+
+    @property
+    def block(self):
+        return self._block or any(entity.blocking for entity in self.entities)
+
+    @property
+    def door_open(self):
+        return self._door_open

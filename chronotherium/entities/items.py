@@ -1,6 +1,7 @@
 from abc import ABC
 
 from chronotherium.entities.entity import Entity, EntityType, ItemType, ActorState
+from chronotherium.window import Color
 
 
 class Item(Entity, ABC):
@@ -13,12 +14,14 @@ class Item(Entity, ABC):
         self.scene.entities.append(self)
 
     def on_pickup(self):
+        self.tile.entities.remove(self)
         self.scene.entities.remove(self)
 
 
 class Hourglass(Item):
 
     GLYPH = ItemType.HOURGLASS
+    COLOR = Color.YELLOW
 
     def on_pickup(self):
         super().on_pickup()
@@ -28,18 +31,33 @@ class Hourglass(Item):
 class HealthPotion(Item):
 
     GLYPH = ItemType.POTION
+    COLOR = Color.RED
     HP = 3
 
     def on_pickup(self):
+        if self.scene.player.hp == self.scene.player.max_hp:
+            self.scene.log("You're already at full health.")
+            return
+        # Only heal up to max hp
+        if self.scene.player.hp + self.HP > self.scene.player.max_hp:
+            self.scene.player.delta_hp += self.scene.player.max_hp - self.scene.player.hp
+        else:
+            self.scene.player.delta_hp += self.HP
         super().on_pickup()
-        self.scene.player.delta_hp += self.HP
 
 
 class TimePotion(Item):
 
     GLYPH = ItemType.POTION
+    COLOR = Color.VIOLET
     TP = 3
 
     def on_pickup(self):
+        if self.scene.player.tp == self.scene.player.max_tp:
+            self.scene.log("Your time power is already full.")
+            return
+        if self.scene.player.tp + self.TP > self.scene.player.max_tp:
+            self.scene.player.delta_tp += self.scene.player.max_tp - self.scene.player.tp
+        else:
+            self.scene.player.delta_tp += self.TP
         super().on_pickup()
-        self.scene.player.delta_tp += self.TP

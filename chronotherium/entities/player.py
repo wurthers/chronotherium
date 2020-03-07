@@ -44,7 +44,7 @@ class Player(Actor):
     PUSH_DAMAGE = 1
     DIAGONAL_COST = 4
     DIAGONAL_DAMAGE = 3
-    HEAL_RATE = 10
+    HEAL_RATE = 15
 
     def __init__(self, position: Point, map: Map, scene: 'GameScene'):
         super().__init__(position, map, scene)
@@ -57,13 +57,16 @@ class Player(Actor):
         self._heal_rate = self.HEAL_RATE
         self._diagonal_cost = self.DIAGONAL_COST
         self._diagonal_damage = self.DIAGONAL_DAMAGE
+
+        self._found_boss = False
         self.__skills = {}
 
     def turn(self):
-        self._heal_clock += 1
-        if self._heal_clock % self._heal_rate == 0:
-            self.delta_hp += 1
-            self._heal_clock = 0
+        if self.hp < self.max_hp:
+            self._heal_clock += 1
+            if self._heal_clock % self._heal_rate == 0:
+                self.delta_hp += 1
+                self._heal_clock = 0
         super().turn()
 
     @property

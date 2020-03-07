@@ -302,8 +302,8 @@ class Actor(Entity, ABC):
         context.layer(0)
         context.color(self.window.fg_color)
 
-    # def change_floors(self):
-    #     pass
+    def change_floors(self):
+        pass
 
     def bump(self, target):
         if d6():
@@ -342,14 +342,16 @@ class Enemy(Actor, ABC):
         return self._drop
 
     def ai_behavior(self):
-        raise NotImplementedError('Enemy must have AI implemented!')
+        return True
 
     def drop_item(self):
         if self.drop is not None:
-            item = self.drop(self.position, self.map, self.scene)
-            item.update_block()
+            if d6(limit=0, over=True):
+                item = self.drop(self.position, self.map, self.scene)
+                item.update_block()
 
     def on_death(self):
         self.unblock()
+        self.scene.entities.remove(self)
         self.drop_item()
         self.scene.player.delta_xp += self.xp

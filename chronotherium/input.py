@@ -7,10 +7,11 @@ from bearlibterminal import terminal as bearlib
 from chronotherium.entities.entity import EntityType
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.geom import Point
+from clubsandwich.tilemap import CellOutOfBoundsError
 
+from chronotherium.tiles.tile import Door, Stairs, StairsUp
 from chronotherium.time import Time, TimeError
 from chronotherium.window import Window, Color
-from clubsandwich.tilemap import CellOutOfBoundsError
 
 if TYPE_CHECKING:
     from chronotherium.scene import GameScene, Player
@@ -44,6 +45,7 @@ class Command(Enum):
     DRAIN = bearlib.TK_0
     GAIN = bearlib.TK_KP_PLUS
 
+    RANGED = bearlib.TK_F
     REWIND = bearlib.TK_R
     PUSH = bearlib.TK_P
     DIAGONAL = bearlib.TK_E
@@ -52,6 +54,11 @@ class Command(Enum):
     PICKUP = bearlib.TK_COMMA
     PICKUP_G = bearlib.TK_G
     LOOK = bearlib.TK_SEMICOLON
+    OPEN = bearlib.TK_O
+
+class ShiftCommand(Enum):
+    STAIRS_UP = bearlib.TK_PERIOD
+    STAIRS_DOWN = bearlib.TK_COMMA
 
 
 class Input:
@@ -67,6 +74,7 @@ class Input:
         self.time = Time()
 
         self.__command_map = {
+            Command.RANGED: self.ranged,
             Command.REWIND: self.rewind,
             Command.HURT: self.hurt_player,
             Command.DRAIN: self.drain_player,
@@ -77,7 +85,13 @@ class Input:
             Command.WORMHOLE: self.wormhole,
             Command.PICKUP: self.pickup,
             Command.PICKUP_G: self.pickup,
-            Command.LOOK: self.look
+            Command.LOOK: self.look,
+            Command.OPEN: self.open
+        }
+
+        self.__shift_command_map = {
+            ShiftCommand.STAIRS_UP: self.stairs,
+            ShiftCommand.STAIRS_DOWN: self.stairs
         }
 
     __delta_map = {
@@ -106,10 +120,16 @@ class Input:
             return self.handle_move(Direction(key))
         except ValueError:
             pass
-        try:
-            return self.__command_map[Command(key)]()
-        except ValueError:
-            pass
+        if bearlib.check(bearlib.TK_SHIFT):
+            try:
+                return self.__shift_command_map[ShiftCommand(key)]()
+            except ValueError:
+                pass
+        else:
+            try:
+                return self.__command_map[Command(key)]()
+            except ValueError:
+                pass
 
     def handle_move(self, direction):
         return self.player.actor_move(self.__delta_map[direction])
@@ -135,6 +155,9 @@ class Input:
         self.player.turn()
         return False
 
+    def ranged(self):
+        pass
+
     def rewind(self):
         state = None
 
@@ -152,7 +175,7 @@ class Input:
 
         bearlib.color(Color.ORANGE)
         self.scene.print_stats(right_arrow=right_arrow, left_arrow=left_arrow)
-        self.scene.print_tiles()
+        self.scene.draw_tiles()
         bearlib.refresh()
 
         key = bearlib.read()
@@ -212,8 +235,8 @@ class Input:
                                            left_arrow=left_arrow)
 
                     bearlib.color(self.window.fg_color)
-                    self.scene.print_tiles()
-                    self.scene.print_entities()
+                    self.scene.draw_tiles()
+                    self.scene.draw_entities()
                     self.scene.print_log()
                     bearlib.refresh()
 
@@ -239,9 +262,9 @@ class Input:
                         break
                 if enemy is not None:
                     self.player.delta_tp -= self.player.freeze_cost
-                    turns = randrange(1, 2)
+                    turns = randrange(1, 3)
                     # +1 -- Account for this current turn
-                    enemy.freeze(turns + 1)
+                    enemy.freeze(turns + 2)
                     self.scene.log(f'You freeze the {enemy.name} in suspended animation.')
                     return True
                 else:
@@ -383,3 +406,40 @@ class Input:
 
     def look(self):
         pass
+
+    def open(self):
+        key = bearlib.read()
+
+        while True:
+            try:
+                direction = Direction(key)
+            except ValueError:
+                key = bearlib.read()
+                self.scene.log("Open what?")
+                continue
+
+            delta = self.__delta_map[direction]
+            target_square = self.player.position + delta
+            target_tile = self.scene.map.floor.cell(target_square)
+
+            if not isinstance(target_tile, Door):
+                self.scene.log("There's no door there.")
+                return False
+            else:
+                if target_tile.interact():
+                    if target_tile.door_open:
+                        self.scene.log("The door remembers a time when it was open.")
+                    else:
+                        self.scene.log("The door thumps shut.")
+                    target_tile.draw_tile(self.context)
+                else:
+                    self.scene.log("There's something blocking the doorway.")
+                return True
+
+    def stairs(self):
+        target_tile = self.scene.map.floor.cell(self.player.position)
+        if not isinstance(target_tile, Stairs):
+            self.scene.log("There are no stairs there.")
+            return False
+        else:
+            self.scene.log(f"You {'ascend' if isinstance(target_tile, StairsUp) else 'descend'} the stairs.")

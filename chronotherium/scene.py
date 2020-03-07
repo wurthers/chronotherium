@@ -2,15 +2,16 @@ from typing import List
 
 from bearlibterminal import terminal as bearlib
 
+from chronotherium.tiles.tile import Door
 from clubsandwich.geom import Rect, Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 
-from chronotherium.window import Window, Color, LOG_HEIGHT, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
+from chronotherium.window import Window, Color, LOG_HEIGHT, VIEW_SIZE, MAP_ORIGIN
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, ActorState, EntityType
 from chronotherium.entities.player import Player
-from chronotherium.entities.chronotherium import Chronotherium
+from chronotherium.entities.sentry import Sentry
 from chronotherium.input import Input
 from chronotherium.time import Time
 
@@ -117,8 +118,47 @@ class StartScene(PrintScene):
         self.director.pop_scene()
 
     def next_scene(self):
+        self.director.push_scene(FlavorScene())
+
+
+class FlavorScene(PrintScene):
+
+    def __init__(self):
+
+        self.__input_map = {
+            bearlib.TK_SPACE: self.next_scene,
+            bearlib.TK_Q: self.quit,
+            bearlib.TK_ESCAPE: self.quit
+        }
+
+        super().__init__()
+
+    def terminal_update(self, is_active: bool = False):
+        self.pprint_center(["Flavor goes here!", "- Space -"])
+
+    def terminal_read(self, val):
+        try:
+            self.__input_map[val]()
+        except KeyError:
+            pass
+
+    def quit(self):
+        self.director.pop_scene()
+
+    def next_scene(self):
         self.director.push_scene(GameScene())
 
+    def quit(self):
+        self.context.clear()
+        self.pprint_center(["Are you sure you", "want to quit?", "", "Space - Yes ", "Esc - No"])
+        self.context.refresh()
+        while True:
+            key = bearlib.read()
+            if key == bearlib.TK_SPACE:
+                self.director.quit()
+                break
+            elif key == bearlib.TK_ESCAPE:
+                break
 
 class GameScene(PrintScene):
 
@@ -126,6 +166,7 @@ class GameScene(PrintScene):
 
     def __init__(self):
         super().__init__()
+
         self.entities = []
 
         self.__input_map = {
@@ -133,9 +174,11 @@ class GameScene(PrintScene):
             bearlib.TK_ESCAPE: self.quit
         }
 
-        self.map = Map(MAP_SIZE, VIEW_SIZE, MAP_ORIGIN, self)
+        self.map = Map(self)
 
-        self.map.populate_floor({Chronotherium: 1})
+        self.map.populate_floor(self.map.floor, {Sentry: 1})
+        self.map.floor.set_cell(Door(self.map.find_open_point()))
+        self.entities = self.map.floor.entities
         self.context = Context()
         self.player = Player(self.map.view_center, self.map, self)
         self.input = Input(self.player, self.context, self)
@@ -160,13 +203,13 @@ class GameScene(PrintScene):
             elif key == bearlib.TK_ESCAPE:
                 break
 
-    def print_tiles(self):
+    def draw_tiles(self):
         for cell in self.map.floor.cells:
             if self.bounds.contains(cell.point + self.relative_pos):
                 if not cell.occupied:
                     cell.draw_tile(self.context)
 
-    def print_entities(self):
+    def draw_entities(self):
         for entity in self.entities:
             entity.draw(self.context)
 
@@ -197,6 +240,9 @@ class GameScene(PrintScene):
         self.pprint(corner.x, corner.y + 4, time_string)
         bearlib.color(self.window.fg_color)
 
+    def print_gutter(self):
+        pass
+
     def terminal_read(self, val) -> None:
         if val in self.__input_map:
             self.__input_map[val]()
@@ -215,7 +261,7 @@ class GameScene(PrintScene):
             self.director.replace_scene(VictoryScene())
         bearlib.clear()
         with self.context.translate(self.relative_pos):
-            self.print_tiles()
+            self.draw_tiles()
             for entity in self.entities:
                 if isinstance(entity, Actor):
                     if entity.state == ActorState.DEAD:

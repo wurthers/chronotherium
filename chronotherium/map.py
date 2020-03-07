@@ -1,13 +1,17 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from random import randrange
+from logging import getLogger
 
 from clubsandwich.geom import Point, Size, Rect
 from clubsandwich.tilemap import TileMap, CellOutOfBoundsError
 
 from chronotherium.tiles.tile import Tile, Empty, FloorTile, Wall, Orientation
+from chronotherium.window import MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
 
 if TYPE_CHECKING:
     from chronotherium.scene import GameScene
+
+logger = getLogger()
 
 
 class Floor(TileMap):
@@ -26,58 +30,75 @@ class Floor(TileMap):
         self.bounds = Rect(Point(0, 0), Size(width, height))
         self.area = self.bounds.with_inset(1)
 
-        self.carve_floor()
         self.stairs_down = None
         self.stairs_up = None
 
-    def set_cell(self, point: Point, tile: Tile):
+    def set_cell(self, tile: Tile):
         try:
-            self._cells[point.x][point.y] = tile
+            self._cells[tile.point.x][tile.point.y] = tile
         except IndexError:
-            print("Setting cell out of bounds!")
+            logger.debug("Setting cell out of bounds!")
             return False
 
     def carve_floor(self):
-        for p in self.area.points:
-            self.set_cell(p, FloorTile(p))
+        for point in self.area.points:
+            self.set_cell(FloorTile(point))
 
-        self.set_cell(self.bounds.origin, Wall(self.bounds.origin, Orientation.TOP_LEFT))
-        self.set_cell(self.bounds.point_top_right, Wall(self.bounds.point_top_right, Orientation.TOP_RIGHT))
-        self.set_cell(self.bounds.point_bottom_right, Wall(self.bounds.point_bottom_right,
-                                                           Orientation.BOTTOM_RIGHT))
-        self.set_cell(self.bounds.point_bottom_left, Wall(self.bounds.point_bottom_left, Orientation.BOTTOM_LEFT))
-        for p in self.bounds.points_top:
-            self.set_cell(p, Wall(p, Orientation.HORIZONTAL))
-        for p in self.bounds.points_bottom:
-            self.set_cell(p, Wall(p, Orientation.HORIZONTAL))
-        for p in self.bounds.points_left:
-            self.set_cell(p, Wall(p, Orientation.VERTICAL))
-        for p in self.bounds.points_right:
-            self.set_cell(p, Wall(p, Orientation.VERTICAL))
+        self.set_cell(Wall(self.bounds.origin, Orientation.TOP_LEFT))
+        self.set_cell(Wall(self.bounds.point_top_right, Orientation.TOP_RIGHT))
+        self.set_cell(Wall(self.bounds.point_bottom_right, Orientation.BOTTOM_RIGHT))
+        self.set_cell(Wall(self.bounds.point_bottom_left, Orientation.BOTTOM_LEFT))
+        for point in self.bounds.points_top:
+            self.set_cell(Wall(point, Orientation.HORIZONTAL))
+        for point in self.bounds.points_bottom:
+            self.set_cell(Wall(point, Orientation.HORIZONTAL))
+        for point in self.bounds.points_left:
+            self.set_cell(Wall(point, Orientation.VERTICAL))
+        for point in self.bounds.points_right:
+            self.set_cell(Wall(point, Orientation.VERTICAL))
 
 
 class Map:
 
-    def __init__(self, floor_size: Size, view_size: Size, origin: Point, scene: 'GameScene'):
-        self._floor_size = floor_size
-        self._origin = origin
+    FLOORS = 5
+    FLOOR_SIZE = MAP_SIZE
+    VIEW_SIZE = VIEW_SIZE
+    ORIGIN = MAP_ORIGIN
+
+    def __init__(self, scene: 'GameScene'):
+
+        self.__floors = {}
+
+        self._floor_size = self.FLOOR_SIZE
+        self._origin = self.ORIGIN
         self._center = Point(int(self._floor_size.width / 2), int(self._floor_size.height / 2))
-        self._view_size = view_size
+        
+        self._view_size = self.VIEW_SIZE
         self._view_rect = Rect(self._origin, self._view_size)
         self._view_center = Point(int(self._view_size.width / 2), int(self._view_size.height / 2))
-
-        self.floor = Floor(floor_size)
-
+        
+        self._current_floor = 0
+        
         self.scene = scene
 
-    def populate_floor(self, enemy_density):
+        for i in range(0, self.FLOORS):
+            self.__floors[i] = self.generate_floor()
+            self.populate_floor(self.__floors[i])
+
+    def generate_floor(self) -> Floor:
+        floor = Floor(self._floor_size)
+        floor.carve_floor()
+        return floor
+
+    def populate_floor(self, floor, enemy_density=None):
         enemies = []
+        enemy_density = enemy_density or {}
         for enemy, density in enemy_density.items():
 
-            point = self.find_open_point()
+            point = self.find_open_point(floor)
             enemies.append(enemy(point, self, self.scene))
 
-        self.floor.entities.extend(enemies)
+        floor.entities.extend(enemies)
         return enemies
 
     def closest_open_point(self, point: Point) -> Point:
@@ -93,12 +114,14 @@ class Map:
                     return found
         return found
 
-    def find_open_point(self) -> Point:
+    def find_open_point(self, floor: Optional[Floor] = None) -> Point:
+        if floor is None:
+            floor = self.floor
         while True:
-            point = self.floor.area.get_random_point()
+            point = floor.area.get_random_point()
             try:
                 found = True
-                if self.floor.cell(point).block or not self.floor.cell(point).open:
+                if floor.cell(point).block or not floor.cell(point).open:
                     found = False
                 if found:
                     return point
@@ -119,6 +142,14 @@ class Map:
             if self.floor.area.contains(point + check):
                 safe.append(point + check)
         return safe
+
+    @property
+    def floor(self):
+        return self.__floors[self._current_floor]
+
+    @property
+    def current_floor(self):
+        return self._current_floor
 
     @property
     def floor_size(self):
