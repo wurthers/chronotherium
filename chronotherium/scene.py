@@ -8,7 +8,7 @@ from clubsandwich.director import Scene
 
 from chronotherium.window import Window, Color, LOG_HEIGHT, MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
 from chronotherium.map import Map
-from chronotherium.entities.entity import Actor, ActorState
+from chronotherium.entities.entity import Actor, ActorState, EntityType
 from chronotherium.entities.player import Player
 from chronotherium.entities.chronotherium import Chronotherium
 from chronotherium.input import Input
@@ -34,7 +34,7 @@ class PrintScene(Scene):
         :param string: String to print to screen
         """
         bearlib.layer(1)
-        bearlib.composition("TK_ON")
+        bearlib.composition(bearlib.TK_ON)
         pos = x
         cell_size, _ = self.window.cell_size.split('x')
         cell_width = int(cell_size)
@@ -48,7 +48,7 @@ class PrintScene(Scene):
                 offset = 0 - pos * (cell_width / 2)
                 bearlib.put_ext(pos, y, int(offset), 0, c)
         bearlib.layer(0)
-        bearlib.composition("TK_OFF")
+        bearlib.composition(bearlib.TK_OFF)
 
     def pprint_center(self, text: List[str]):
         """
@@ -160,11 +160,15 @@ class GameScene(PrintScene):
             elif key == bearlib.TK_ESCAPE:
                 break
 
-    def print_entities(self):
+    def print_tiles(self):
         for cell in self.map.floor.cells:
             if self.bounds.contains(cell.point + self.relative_pos):
                 if not cell.occupied:
                     cell.draw_tile(self.context)
+
+    def print_entities(self):
+        for entity in self.entities:
+            entity.draw(self.context)
 
     def print_stats(self, hp: int = None, tp: int = None, tick: int = None, left_arrow: bool = False,
                     right_arrow: bool = False):
@@ -198,8 +202,10 @@ class GameScene(PrintScene):
             self.__input_map[val]()
         with self.context.translate(self.relative_pos):
             if self.input.handle_key(val):
+                self.player.turn()
                 for entity in self.entities:
-                    entity.ai_behavior()
+                    if entity.type == EntityType.ENEMY and entity.ai_behavior():
+                        entity.turn()
                 self.time.tick()
 
     def terminal_update(self, is_active: bool = False) -> None:
@@ -209,7 +215,7 @@ class GameScene(PrintScene):
             self.director.replace_scene(VictoryScene())
         bearlib.clear()
         with self.context.translate(self.relative_pos):
-            self.print_entities()
+            self.print_tiles()
             for entity in self.entities:
                 if isinstance(entity, Actor):
                     if entity.state == ActorState.DEAD:

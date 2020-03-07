@@ -4,15 +4,15 @@ from chronotherium.window import Color
 from chronotherium.entities.items import HealthPotion
 
 
-class Knight(Enemy):
+class Sentry(Enemy):
 
-    NAME = "Clockwork Knight"
-    DESCRIPTION = "A windup automata bent on giant-slaying."
-    GLYPH = ActorType.KNIGHT
-    BASE_HP = 2
+    DESCRIPTION = "An ornate biped set to forever guard the halls of the Time Palace."
+    NAME = "Eternal Sentry"
+    GLYPH = ActorType.SENTRY
+    BASE_HP = 4
     BASE_TP = 0
-    XP = 1
-    COLOR = Color.BASE02
+    XP = 2
+    COLOR = Color.VIOLET
     DROP = HealthPotion
 
     def ai_behavior(self):

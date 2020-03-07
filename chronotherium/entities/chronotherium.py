@@ -24,3 +24,4 @@ class Chronotherium(Enemy):
         delta = Point(x, y)
         self.actor_move(delta)
         self.turn()
+        return True

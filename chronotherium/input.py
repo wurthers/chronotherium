@@ -10,6 +10,7 @@ from clubsandwich.geom import Point
 
 from chronotherium.time import Time, TimeError
 from chronotherium.window import Window, Color
+from clubsandwich.tilemap import CellOutOfBoundsError
 
 if TYPE_CHECKING:
     from chronotherium.scene import GameScene, Player
@@ -50,6 +51,7 @@ class Command(Enum):
     WORMHOLE = bearlib.TK_W
     PICKUP = bearlib.TK_COMMA
     PICKUP_G = bearlib.TK_G
+    LOOK = bearlib.TK_SEMICOLON
 
 
 class Input:
@@ -74,7 +76,8 @@ class Input:
             Command.FREEZE: self.freeze,
             Command.WORMHOLE: self.wormhole,
             Command.PICKUP: self.pickup,
-            Command.PICKUP_G: self.pickup
+            Command.PICKUP_G: self.pickup,
+            Command.LOOK: self.look
         }
 
     __delta_map = {
@@ -149,7 +152,7 @@ class Input:
 
         bearlib.color(Color.ORANGE)
         self.scene.print_stats(right_arrow=right_arrow, left_arrow=left_arrow)
-        self.scene.print_entities()
+        self.scene.print_tiles()
         bearlib.refresh()
 
         key = bearlib.read()
@@ -209,6 +212,7 @@ class Input:
                                            left_arrow=left_arrow)
 
                     bearlib.color(self.window.fg_color)
+                    self.scene.print_tiles()
                     self.scene.print_entities()
                     self.scene.print_log()
                     bearlib.refresh()
@@ -218,8 +222,7 @@ class Input:
         return False
 
     def freeze(self):
-
-        target_square = self.player.position + Point(0, 1)
+        target_square = self.scene.map.find_in_bounds_orthogonal(self.player.position)
         bearlib.bkcolor(Color.BLUE)
         self.scene.map.floor.cell(target_square).draw_tile(self.context)
         bearlib.bkcolor(self.window.bg_color)
@@ -229,25 +232,21 @@ class Input:
         while key != bearlib.TK_ESCAPE:
             if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
                 target_tile = self.scene.map.floor.cell(target_square)
-                if not target_tile.occupied:
+                enemy = None
+                for entity in target_tile.entities:
+                    if entity.type == EntityType.ENEMY:
+                        enemy = entity
+                        break
+                if enemy is not None:
+                    self.player.delta_tp -= self.player.freeze_cost
+                    turns = randrange(1, 2)
+                    # +1 -- Account for this current turn
+                    enemy.freeze(turns + 1)
+                    self.scene.log(f'You freeze the {enemy.name} in suspended animation.')
+                    return True
+                else:
                     self.scene.log("There's nothing there to freeze.")
                     return False
-                else:
-                    enemy = None
-                    for entity in target_tile.occupied_by:
-                        if entity.type == EntityType.ENEMY:
-                            enemy = entity
-                            break
-                    if enemy is not None:
-                        self.player.delta_tp -= self.player.freeze_cost
-                        turns = randrange(1, 2)
-                        # +1 -- Account for this current turn
-                        enemy.freeze(turns + 1)
-                        self.scene.log(f'You freeze the {enemy.name} in suspended animation.')
-                        return True
-                    else:
-                        self.scene.log("There's nothing there to freeze.")
-                        return False
             try:
                 direction = Direction(key)
             except ValueError:
@@ -264,26 +263,123 @@ class Input:
             target_tile = self.scene.map.floor.cell(target_square)
             bearlib.bkcolor(Color.BLUE)
             target_tile.draw_tile(self.context)
-            for entity in target_tile.occupied_by:
+            for entity in target_tile.entities:
                 entity.draw(self.context)
             bearlib.bkcolor(self.window.bg_color)
             bearlib.refresh()
 
             key = bearlib.read()
 
-
     def push(self):
-        pass
+        target_square = self.scene.map.find_in_bounds_orthogonal(self.player.position, delta=2)
+        self.context.bkcolor(Color.MAGENTA)
+        target_tile = self.scene.map.floor.cell(target_square)
+        target_tile.draw_tile(self.context)
+        for entity in target_tile.entities:
+            entity.draw(self.context)
+        self.context.bkcolor(self.window.bg_color)
+        bearlib.refresh()
+
+        direction = Direction.WAIT
+
+        key = bearlib.read()
+        while key != bearlib.TK_ESCAPE:
+            if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
+                target_tile = self.scene.map.floor.cell(target_square)
+                enemy = None
+                for entity in target_tile.entities:
+                    if entity.type == EntityType.ENEMY:
+                        enemy = entity
+                        break
+                if enemy is not None:
+                    self.player.delta_tp -= self.player.push_cost
+                    self.player.update_tp()
+
+                    enemy.delta_hp -= self.player.push_damage
+                    delta = self.__delta_map[direction]
+                    tile = self.scene.map.floor.cell(enemy.position + delta)
+                    if tile.block:
+                        enemy.delta_hp -= 1
+                    else:
+                        enemy.delta_pos += delta
+                        enemy.update_pos()
+                    enemy.update_hp()
+                    self.scene.log(f'You rip open a wormhole and push the {enemy.name} through. '
+                                   f'{enemy.hp}/{enemy.max_hp}')
+                    return True
+                else:
+                    self.scene.log("There's nothing there to push.")
+                    return False
+            try:
+                direction = Direction(key)
+            except ValueError:
+                key = bearlib.read()
+                continue
+
+            # Clears background from previous tile.
+            bearlib.bkcolor(self.window.bg_color)
+            try:
+                target_tile.draw_tile(self.context)
+            except CellOutOfBoundsError:
+                key = bearlib.read()
+                continue
+
+            delta = self.__delta_map[direction] * 2
+            target_square = self.player.position + delta
+            try:
+                target_tile = self.scene.map.floor.cell(target_square)
+            except CellOutOfBoundsError:
+                key = bearlib.read()
+                continue
+            self.context.bkcolor(Color.MAGENTA)
+            target_tile.draw_tile(self.context)
+            for entity in target_tile.entities:
+                entity.draw(self.context)
+            bearlib.bkcolor(self.window.bg_color)
+            bearlib.refresh()
+
+            key = bearlib.read()
 
     def diagonal(self):
-        pass
+        targets = self.scene.map.diagonals(self.player.position)
+        bearlib.bkcolor(Color.YELLOW)
+        for target in targets:
+            self.scene.map.floor.cell(target).draw_tile(self.context)
+        bearlib.bkcolor(self.window.bg_color)
+        bearlib.refresh()
+
+        key = bearlib.read()
+        while key != bearlib.TK_ESCAPE:
+            if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
+                enemies = []
+                for target in targets:
+                    for entity in self.scene.map.floor.cell(target).entities:
+                        if entity.type == EntityType.ENEMY:
+                            enemies.append(entity)
+                        break
+                if enemies:
+                    self.player.delta_tp -= self.player.diagonal_cost
+                    self.player.update_tp()
+
+                    for enemy in enemies:
+                        enemy.delta_hp -= self.player.diagonal_damage
+                        enemy.update_hp()
+                    self.scene.log(f'You conjure ephemeral black holes that eat away at your enemies.')
+                    return True
+                else:
+                    self.scene.log("There's nothing there to push.")
+                    return False
+            key = bearlib.read()
 
     def wormhole(self):
         pass
 
     def pickup(self):
-        entities = self.player.tile.occupied_by
+        entities = self.player.tile.entities
         for entity in entities:
             if entity.type == EntityType.ITEM:
                 entity.on_pickup()
         return False
+
+    def look(self):
+        pass

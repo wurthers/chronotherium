@@ -41,7 +41,7 @@ class Tile(Cell, ABC):
         self._open = self.OPEN
 
         self.glyph = None
-        self.occupied_by = []
+        self.entities = []
 
     def draw_tile(self, context: Context):
         context.color(self.color)
@@ -50,15 +50,15 @@ class Tile(Cell, ABC):
 
     @property
     def block(self):
-        return self._block or any(entity.blocking for entity in self.occupied_by)
+        return self._block or any(entity.blocking for entity in self.entities)
 
     @property
     def occupied(self):
-        return len(self.occupied_by) > 0
+        return len(self.entities) > 0
 
     @property
     def open(self):
-        return self._open or self.blockz    
+        return self._open or self.block
 
 
 class Empty(Tile):

@@ -28,8 +28,18 @@ class Hourglass(Item):
 class HealthPotion(Item):
 
     GLYPH = ItemType.POTION
-    HP = 2
+    HP = 3
 
     def on_pickup(self):
         super().on_pickup()
         self.scene.player.delta_hp += self.HP
+
+
+class TimePotion(Item):
+
+    GLYPH = ItemType.POTION
+    TP = 3
+
+    def on_pickup(self):
+        super().on_pickup()
+        self.scene.player.delta_tp += self.TP

@@ -42,6 +42,7 @@ class ActorType(Enum):
     BEAST = 0x0043      # C
     GOLEM = 0x0038      # 8
     KNIGHT = 0x004B     # K
+    SENTRY = 0x0073     # s
 
 
 class ItemType(Enum):
@@ -106,8 +107,12 @@ class Entity(ABC):
         return self.map.origin - self._pos
 
     def draw(self, context):
-        context.color(self.color)
+        if context.state(bearlib.TK_COLOR) == self.color:
+            context.color(self.window.fg_color)
+        else:
+            context.color(self.color)
         context.layer(self.layer)
+        bearlib.composition(bearlib.TK_OFF)
         context.put(self.position, self.glyph)
         context.layer(0)
         context.color(self.window.fg_color)
@@ -116,12 +121,12 @@ class Entity(ABC):
         bearlib.clear(self._pos.x, self._pos.y, 1, 1)
 
     def unblock(self):
-        if self.blocking and self in self.tile.occupied_by:
-            self.tile.occupied_by.remove(self)
+        if self.blocking and self in self.tile.entities:
+            self.tile.entities.remove(self)
 
     def update_block(self):
-        if self not in self.tile.occupied_by:
-            self.tile.occupied_by.append(self)
+        if self not in self.tile.entities:
+            self.tile.entities.append(self)
 
 
 class Actor(Entity, ABC):
@@ -145,6 +150,7 @@ class Actor(Entity, ABC):
         self._tp = self.BASE_TP
         self._max_tp = self.BASE_TP
         self._xp = 0
+        self._bump_damage = 1
 
         self.frozen = 0
         self.state = ActorState.ALIVE
@@ -164,7 +170,7 @@ class Actor(Entity, ABC):
             target_point = self._pos + delta
             dest_cell = self.map.floor.cell(target_point)
             if dest_cell.block and dest_cell.occupied:
-                for entity in dest_cell.occupied_by:
+                for entity in dest_cell.entities:
                     if self.type == EntityType.PLAYER and entity.type == EntityType.ENEMY:
                         return self.bump(entity)
                     if self.type == EntityType.ENEMY and entity.type == EntityType.PLAYER:
@@ -174,7 +180,6 @@ class Actor(Entity, ABC):
             else:
                 self.delta_pos = delta
                 self.unblock()
-                self.turn()
                 return True
         except CellOutOfBoundsError:
             return False
@@ -203,6 +208,10 @@ class Actor(Entity, ABC):
     def states(self):
         return self._states
 
+    @property
+    def bump_damage(self):
+        return self._bump_damage
+
     def record(self):
         tick = self.time.time
         self._states[tick] = self.State(self)
@@ -214,8 +223,16 @@ class Actor(Entity, ABC):
             del self._states[tick - self.time.MAX_RECORD]
         self.update_hp()
         self.update_tp()
-        self.update_pos()
         self.update_xp()
+        if self.frozen > 0:
+            self.frozen -= 1
+            if self.frozen == 0:
+                self.scene.log(f'The {self.name} thaws.')
+            else:
+                self.scene.log(f'The {self.name} is stuck in time.')
+            return
+        else:
+            self.update_pos()
         if self.state == ActorState.DEAD:
             self.on_death()
 
@@ -234,13 +251,6 @@ class Actor(Entity, ABC):
             self.delta_tp = 0
 
     def update_pos(self):
-        if self.frozen > 0:
-            self.frozen -= 1
-            self.scene.log(f'The {self.name} is stuck in time.')
-            if self.frozen == 0:
-                self.scene.log(f'The {self.name} thaws.')
-            else:
-                return
         if self.delta_pos != Point(0, 0):
             self.unblock()
             self._pos += self.delta_pos
@@ -284,6 +294,7 @@ class Actor(Entity, ABC):
     def draw_preview(self, context: Context, time: int):
         state = self.preview_state(time)
         self.erase()
+        self.tile.draw_tile(context)
 
         context.color(self.color)
         context.layer(1)
@@ -296,7 +307,7 @@ class Actor(Entity, ABC):
 
     def bump(self, target):
         if d6():
-            target.delta_hp -= 1
+            target.delta_hp -= self.bump_damage
             player_message = f"You use your regular meat hands to pummel the {target.name}. "\
                              f"({target.hp + target.delta_hp}/{target.max_hp})"
             enemy_message = f"The {self.name} bashes into you."
@@ -304,15 +315,14 @@ class Actor(Entity, ABC):
             player_message = f"You swing a fist at the the {target.name} but miss."
             enemy_message = f"The {self.name} charges for you but you manage to dodge."
         self.scene.log(f'{player_message if self._glyph == ActorType.PLAYER else enemy_message}')
-        target.turn()
-        self.turn()
+        target.update_hp()
         return True
 
     def freeze(self, turns):
         self.frozen += turns
 
     def on_death(self):
-        pass
+        raise NotImplementedError('on_death must be implemented by child class.')
 
 
 class Enemy(Actor, ABC):
@@ -330,7 +340,7 @@ class Enemy(Actor, ABC):
     @property
     def drop(self):
         return self._drop
-    
+
     def ai_behavior(self):
         raise NotImplementedError('Enemy must have AI implemented!')
 

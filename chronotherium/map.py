@@ -4,7 +4,7 @@ from random import randrange
 from clubsandwich.geom import Point, Size, Rect
 from clubsandwich.tilemap import TileMap, CellOutOfBoundsError
 
-from chronotherium.tiles.tile import Empty, FloorTile, Wall, Orientation
+from chronotherium.tiles.tile import Tile, Empty, FloorTile, Wall, Orientation
 
 if TYPE_CHECKING:
     from chronotherium.scene import GameScene
@@ -30,7 +30,7 @@ class Floor(TileMap):
         self.stairs_down = None
         self.stairs_up = None
 
-    def set_cell(self, point, tile):
+    def set_cell(self, point: Point, tile: Tile):
         try:
             self._cells[point.x][point.y] = tile
         except IndexError:
@@ -105,6 +105,20 @@ class Map:
             except CellOutOfBoundsError:
                 pass
             continue
+
+    def find_in_bounds_orthogonal(self, point: Point, delta: int = 1) -> Point:
+        to_check = [Point(0, -delta), Point(delta, 0), Point(0, delta), Point(-delta, 0)]
+        for check in to_check:
+            if self.floor.area.contains(point + check):
+                return point + check
+
+    def diagonals(self, point: Point, delta: int = 2) -> Point:
+        to_check = [Point(-delta, -delta), Point(delta, delta), Point(delta, -delta), Point(-delta, delta)]
+        safe = []
+        for check in to_check:
+            if self.floor.area.contains(point + check):
+                safe.append(point + check)
+        return safe
 
     @property
     def floor_size(self):
