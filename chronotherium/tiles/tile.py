@@ -2,10 +2,14 @@ from clubsandwich.tilemap import Cell
 from clubsandwich.geom import Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 
+from typing import TYPE_CHECKING, Tuple
 from enum import Enum
 from abc import ABC
 
 from chronotherium.window import Window, Color
+
+if TYPE_CHECKING:
+    from chronotherium.map import Floor
 
 
 class Terrain(Enum):
@@ -27,7 +31,6 @@ class Orientation(Enum):
 
 
 class Tile(Cell, ABC):
-
     COLOR = None
     OPEN = True
     BLOCK_SIGHT = False
@@ -54,7 +57,7 @@ class Tile(Cell, ABC):
     @property
     def glyph(self):
         return self.terrain.value
-    
+
     @property
     def block(self):
         return self._block or any(entity.blocking for entity in self.entities)
@@ -72,14 +75,12 @@ class Tile(Cell, ABC):
 
 
 class Empty(Tile):
-
     OPEN = False
     BLOCK = True
     TERRAIN = Terrain.EMPTY
 
 
 class FloorTile(Tile):
-
     TERRAIN = Terrain.FLOOR
 
 
@@ -87,8 +88,26 @@ class Stairs(Tile, ABC):
 
     OPEN = False
 
-    def interact(self):
-        pass
+    def __init__(self, point: Point):
+        super().__init__(point)
+        self.dest_tile = None
+        self._dest_floor_index = None
+        self._floor_index = None
+
+    @property
+    def floor(self):
+        return self._floor_index
+
+    def interact(self) -> Tile:
+        return self.dest_tile
+
+    def set_destination(self, dest: 'Stairs', floor_index: int, dest_floor_index: int, link: bool = False) -> None:
+        self.dest_tile = dest
+        self._floor_index = floor_index
+        self._dest_floor_index = dest_floor_index
+
+        if link:
+            dest.set_destination(self, dest_floor_index, floor_index, link=False)
 
 
 class StairsUp(Stairs):
@@ -100,7 +119,6 @@ class StairsDown(Stairs):
 
 
 class Wall(Tile):
-
     COLOR = Color.CYAN
     OPEN = False
     BLOCK = True
@@ -112,7 +130,6 @@ class Wall(Tile):
 
 
 class Door(Tile):
-
     COLOR = Color.CYAN
     OPEN = False
     BLOCK = True

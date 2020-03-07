@@ -442,4 +442,10 @@ class Input:
             self.scene.log("There are no stairs there.")
             return False
         else:
-            self.scene.log(f"You {'ascend' if isinstance(target_tile, StairsUp) else 'descend'} the stairs.")
+            dest_tile = target_tile.interact()
+            if dest_tile:
+                self.scene.map.move_floors(dest_tile.floor)
+                self.player.clear_states()
+                self.player.position = dest_tile.point
+                self.scene.log(f"You {'ascend' if isinstance(target_tile, StairsUp) else 'descend'} the stairs.")
+                return True

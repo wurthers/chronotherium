@@ -1,11 +1,11 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, List
 from random import randrange
 from logging import getLogger
 
 from clubsandwich.geom import Point, Size, Rect
 from clubsandwich.tilemap import TileMap, CellOutOfBoundsError
 
-from chronotherium.tiles.tile import Tile, Empty, FloorTile, Wall, Orientation
+from chronotherium.tiles.tile import Tile, Empty, FloorTile, Wall, Orientation, StairsUp, StairsDown
 from chronotherium.window import MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
 
 if TYPE_CHECKING:
@@ -29,9 +29,6 @@ class Floor(TileMap):
             height = self.size.height
         self.bounds = Rect(Point(0, 0), Size(width, height))
         self.area = self.bounds.with_inset(1)
-
-        self.stairs_down = None
-        self.stairs_up = None
 
     def set_cell(self, tile: Tile):
         try:
@@ -57,7 +54,6 @@ class Floor(TileMap):
         for point in self.bounds.points_right:
             self.set_cell(Wall(point, Orientation.VERTICAL))
 
-
 class Map:
 
     FLOORS = 5
@@ -72,18 +68,23 @@ class Map:
         self._floor_size = self.FLOOR_SIZE
         self._origin = self.ORIGIN
         self._center = Point(int(self._floor_size.width / 2), int(self._floor_size.height / 2))
-        
+
         self._view_size = self.VIEW_SIZE
         self._view_rect = Rect(self._origin, self._view_size)
         self._view_center = Point(int(self._view_size.width / 2), int(self._view_size.height / 2))
-        
+
         self._current_floor = 0
-        
+
         self.scene = scene
 
         for i in range(0, self.FLOORS):
             self.__floors[i] = self.generate_floor()
             self.populate_floor(self.__floors[i])
+
+        for index in self.__floors:
+            if self.__floors.get(index + 1):
+                self.place_stairs(index, index + 1)
+
 
     def generate_floor(self) -> Floor:
         floor = Floor(self._floor_size)
@@ -100,6 +101,20 @@ class Map:
 
         floor.entities.extend(enemies)
         return enemies
+
+    def place_stairs(self, floor_index, dest_floor_index):
+        floor = self.__floors[floor_index]
+        dest_floor = self.__floors[dest_floor_index]
+
+        stairs_point = self.find_open_point(floor=floor)
+        dest_point = self.find_open_point(floor=dest_floor)
+
+        stairs_up = StairsUp(stairs_point)
+        stairs_down = StairsDown(dest_point)
+        stairs_up.set_destination(stairs_down, floor_index, dest_floor_index, link=True)
+
+        floor.set_cell(stairs_up)
+        dest_floor.set_cell(stairs_down)
 
     def closest_open_point(self, point: Point) -> Point:
         neighbors = point.neighbors
@@ -135,13 +150,22 @@ class Map:
             if self.floor.area.contains(point + check):
                 return point + check
 
-    def diagonals(self, point: Point, delta: int = 2) -> Point:
+    def diagonals(self, point: Point, delta: int = 2) -> List[Point]:
         to_check = [Point(-delta, -delta), Point(delta, delta), Point(delta, -delta), Point(-delta, delta)]
         safe = []
         for check in to_check:
             if self.floor.area.contains(point + check):
                 safe.append(point + check)
         return safe
+
+    def move_floors(self, floor_index: int):
+        try:
+            self._current_floor = floor_index
+        except AttributeError:
+            logger.info("Tried to move to a floor that doesn't exist!")
+            return self.floor
+
+        return self.__floors[floor_index]
 
     @property
     def floor(self):

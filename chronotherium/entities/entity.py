@@ -99,6 +99,10 @@ class Entity(ABC):
         """
         return self._pos
 
+    @position.setter
+    def position(self, value):
+        self._pos = value
+
     @property
     def relative_position(self) -> Point:
         """
@@ -169,6 +173,9 @@ class Actor(Entity, ABC):
         try:
             target_point = self._pos + delta
             dest_cell = self.map.floor.cell(target_point)
+            # Don't let enemies move onto stairs
+            if self.type == EntityType.ENEMY and isinstance(dest_cell, Stairs):
+                return True
             if dest_cell.block and dest_cell.occupied:
                 for entity in dest_cell.entities:
                     if self.type == EntityType.PLAYER and entity.type == EntityType.ENEMY:
@@ -261,6 +268,9 @@ class Actor(Entity, ABC):
     def update_xp(self):
         self._xp += self.delta_xp
         self.delta_xp = 0
+
+    def clear_states(self):
+        self._states = {}
 
     def restore_state(self, tick: int, hp=True, tp=True, pos=True) -> None:
         """

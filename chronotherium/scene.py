@@ -167,8 +167,6 @@ class GameScene(PrintScene):
     def __init__(self):
         super().__init__()
 
-        self.entities = []
-
         self.__input_map = {
             bearlib.TK_Q: self.quit,
             bearlib.TK_ESCAPE: self.quit
@@ -178,10 +176,13 @@ class GameScene(PrintScene):
 
         self.map.populate_floor(self.map.floor, {Sentry: 1})
         self.map.floor.set_cell(Door(self.map.find_open_point()))
-        self.entities = self.map.floor.entities
         self.context = Context()
-        self.player = Player(self.map.view_center, self.map, self)
+        self.player = Player(self.map.find_open_point(), self.map, self)
         self.input = Input(self.player, self.context, self)
+
+    @property
+    def entities(self):
+        return self.map.floor.entities
 
     @property
     def relative_pos(self) -> Point:
