@@ -114,18 +114,18 @@ class Floor(TileMap):
                 room1 = siblings[0].data.get('room')
                 room2 = siblings[1].data.get('room')
                 if room1 and room2:
-                    self.create_hallway(room1, room2)
+                    self.create_hallway(room1, room2, horiz=siblings[0].is_horz)
             except KeyError as err:
                 pass
 
-    def create_hallway(self, room1: Rect, room2: Rect) -> None:
+    def create_hallway(self, room1: Rect, room2: Rect, horiz=False) -> None:
         print("INSIDE CREATE HALLWAY")
         tile1 = self.cell(room1.get_random_point())
         tile2 = self.cell(room2.get_random_point())
         self.connect_tiles(tile1, tile2)
 
         starting_point = next(tile1.point.points_bresenham_to(tile2.point))
-        if tile1.point.y - starting_point.y == 0:
+        if horiz:
             deltas = (Point(-1, 0), Point(1, 0))
         else:
             deltas = (Point(0, -1), Point(0, 1))
