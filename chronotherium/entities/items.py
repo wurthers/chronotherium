@@ -43,6 +43,8 @@ class HealthPotion(Item):
             self.scene.player.delta_hp += self.scene.player.max_hp - self.scene.player.hp
         else:
             self.scene.player.delta_hp += self.HP
+        self.scene.player.hp_update()
+        self.scene.print_stats(hp=True)
         super().on_pickup()
 
 
@@ -60,4 +62,6 @@ class TimePotion(Item):
             self.scene.player.delta_tp += self.scene.player.max_tp - self.scene.player.tp
         else:
             self.scene.player.delta_tp += self.TP
+        self.scene.player.tp_update()
+        self.scene.print_stats(tp=True)
         super().on_pickup()

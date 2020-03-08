@@ -34,8 +34,8 @@ class Color:
 
 
 TITLE = "Chronotherium - 2020 7DRL"
-WINDOW_WIDTH = 40
-WINDOW_HEIGHT = 30
+WINDOW_WIDTH = 60
+WINDOW_HEIGHT = 45
 ENCODING = 'utf-8'
 SPACING = '1x1'
 FONT = resource_path('../resources/VeraMono.ttf')
@@ -50,10 +50,10 @@ FG_COLOR = Color.BASE1
 BG_COLOR = Color.BASE03
 # Option to draw UI rectangles
 RECTANGLES = False
-MAP_SIZE = Size(18, 18)
-VIEW_SIZE = Size(18, 18)
+MAP_SIZE = Size(30, 30)
+VIEW_SIZE = Size(40, 30)
 MAP_ORIGIN = Point(1, 7)
-LOG_HEIGHT = MAP_ORIGIN.y - 3
+LOG_HEIGHT = MAP_ORIGIN.y - 1
 
 
 class Window:

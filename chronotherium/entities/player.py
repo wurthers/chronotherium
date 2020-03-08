@@ -1,13 +1,12 @@
 from typing import TYPE_CHECKING
 from enum import Enum
 
-from clubsandwich.geom import Point
-
-from .entity import Actor, EntityType, ActorType
-from chronotherium.map import Map
+from chronotherium.tiles.tile import Tile
+from chronotherium.entities.entity import Actor, EntityType, ActorType
 
 if TYPE_CHECKING:
     from chronotherium.scene import GameScene
+    from chronotherium.map import Map
 
 
 class Player(Actor):
@@ -46,8 +45,8 @@ class Player(Actor):
     DIAGONAL_DAMAGE = 3
     HEAL_RATE = 15
 
-    def __init__(self, position: Point, map: Map, scene: 'GameScene'):
-        super().__init__(position, map, scene)
+    def __init__(self, tile: Tile, map: 'Map', scene: 'GameScene'):
+        super().__init__(tile, map, scene)
         self._rewind_limit = self.REWIND_LIMIT
         self._rewind_cost = self.REWIND_COST
         self._freeze_cost = self.FREEZE_COST

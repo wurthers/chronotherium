@@ -4,6 +4,7 @@ from typing import Optional, Union, TYPE_CHECKING
 
 from bearlibterminal import terminal as bearlib
 
+from chronotherium.tiles.tile import Stairs, Tile
 from clubsandwich.geom import Point
 from clubsandwich.tilemap import CellOutOfBoundsError
 from clubsandwich.blt.context import BearLibTerminalContext as Context
@@ -11,12 +12,12 @@ from clubsandwich.blt.context import BearLibTerminalContext as Context
 from enum import Enum
 
 from chronotherium.window import Window, Color
-from chronotherium.map import Map
 from chronotherium.time import Time, TimeError
 from chronotherium.rand import d6
 
 if TYPE_CHECKING:
     from chronotherium.scene import GameScene
+    from chronotherium.map import Map
 
 
 class ActorState(Enum):
@@ -63,8 +64,9 @@ class Entity(ABC):
     BLOCKING: bool = True
     LAYER: int = 1
 
-    def __init__(self, position: Point, map: Map, scene: 'GameScene'):
-        self._pos = position
+    def __init__(self, tile: Tile, map: 'Map', scene: 'GameScene'):
+        self._pos = tile.point
+        self._floor = tile.floor
 
         self.window = Window()
         self.map = map
@@ -90,7 +92,7 @@ class Entity(ABC):
         """
         Returns the cell at this entitiy's current position
         """
-        return self.map.floor.cell(self._pos)
+        return self._floor.cell(self._pos)
 
     @property
     def position(self) -> Point:
@@ -146,7 +148,7 @@ class Actor(Entity, ABC):
             self.tp = actor.tp
             self.pos = actor.position
 
-    def __init__(self, position: Point, map: Map, scene: 'GameScene'):
+    def __init__(self, tile: Tile, map: 'Map', scene: 'GameScene'):
         self.name = self.NAME
         self.description = self.DESCRIPTION
         self._hp = self.BASE_HP
@@ -167,12 +169,12 @@ class Actor(Entity, ABC):
 
         self._states = {}
 
-        super().__init__(position, map, scene)
+        super().__init__(tile, map, scene)
 
     def actor_move(self, delta: Point):
         try:
             target_point = self._pos + delta
-            dest_cell = self.map.floor.cell(target_point)
+            dest_cell = self._floor.cell(target_point)
             # Don't let enemies move onto stairs
             if self.type == EntityType.ENEMY and isinstance(dest_cell, Stairs):
                 return True
@@ -285,8 +287,8 @@ class Actor(Entity, ABC):
         if tp:
             self._tp = state.tp
         if pos:
-            if not self.map.floor.cell(state.pos).open:
-                state.pos = self.map.closest_open_point(state.pos)
+            if not self._floor.cell(state.pos).open:
+                state.pos = self.tile.closest_open_point(state.pos)
                 self.scene.log(f'You were displaced!')
             self._pos = state.pos
 
@@ -341,11 +343,11 @@ class Enemy(Actor, ABC):
     DROP = None
     XP = None
 
-    def __init__(self, position, map, scene):
-        super().__init__(position, map, scene)
+    def __init__(self, tile: Tile, map, scene):
+        super().__init__(tile, map, scene)
         self._drop = self.DROP
         self._xp = self.XP
-        self.scene.entities.append(self)
+        self._floor.entities.append(self)
 
     @property
     def drop(self):
@@ -357,11 +359,11 @@ class Enemy(Actor, ABC):
     def drop_item(self):
         if self.drop is not None:
             if d6(limit=0, over=True):
-                item = self.drop(self.position, self.map, self.scene)
+                item = self.drop(self.tile, self.map, self.scene)
                 item.update_block()
 
     def on_death(self):
         self.unblock()
-        self.scene.entities.remove(self)
+        self._floor.entities.remove(self)
         self.drop_item()
         self.scene.player.delta_xp += self.xp

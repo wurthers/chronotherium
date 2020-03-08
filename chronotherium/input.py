@@ -56,6 +56,7 @@ class Command(Enum):
     LOOK = bearlib.TK_SEMICOLON
     OPEN = bearlib.TK_O
 
+
 class ShiftCommand(Enum):
     STAIRS_UP = bearlib.TK_PERIOD
     STAIRS_DOWN = bearlib.TK_COMMA
@@ -387,10 +388,9 @@ class Input:
                     for enemy in enemies:
                         enemy.delta_hp -= self.player.diagonal_damage
                         enemy.update_hp()
-                    self.scene.log(f'You conjure ephemeral black holes that eat away at your enemies.')
+                    self.scene.log(f'You conjure a swarm of ephemeral black holes.')
                     return True
                 else:
-                    self.scene.log("There's nothing there to push.")
                     return False
             key = bearlib.read()
 
@@ -445,6 +445,7 @@ class Input:
             dest_tile = target_tile.interact()
             if dest_tile:
                 self.scene.map.move_floors(dest_tile.floor)
+                self.player._floor = dest_tile.floor
                 self.player.clear_states()
                 self.player.position = dest_tile.point
                 self.scene.log(f"You {'ascend' if isinstance(target_tile, StairsUp) else 'descend'} the stairs.")

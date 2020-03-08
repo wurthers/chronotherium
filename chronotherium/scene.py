@@ -2,16 +2,14 @@ from typing import List
 
 from bearlibterminal import terminal as bearlib
 
-from chronotherium.tiles.tile import Door
 from clubsandwich.geom import Rect, Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 
-from chronotherium.window import Window, Color, LOG_HEIGHT, VIEW_SIZE, MAP_ORIGIN
+from chronotherium.window import Window, Color, LOG_HEIGHT
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, ActorState, EntityType
 from chronotherium.entities.player import Player
-from chronotherium.entities.sentry import Sentry
 from chronotherium.input import Input
 from chronotherium.time import Time
 
@@ -142,23 +140,12 @@ class FlavorScene(PrintScene):
         except KeyError:
             pass
 
-    def quit(self):
-        self.director.pop_scene()
-
     def next_scene(self):
         self.director.push_scene(GameScene())
 
     def quit(self):
-        self.context.clear()
-        self.pprint_center(["Are you sure you", "want to quit?", "", "Space - Yes ", "Esc - No"])
-        self.context.refresh()
-        while True:
-            key = bearlib.read()
-            if key == bearlib.TK_SPACE:
-                self.director.quit()
-                break
-            elif key == bearlib.TK_ESCAPE:
-                break
+        self.director.pop_scene()
+
 
 class GameScene(PrintScene):
 
@@ -172,12 +159,14 @@ class GameScene(PrintScene):
             bearlib.TK_ESCAPE: self.quit
         }
 
-        self.map = Map(self)
-
-        self.map.populate_floor(self.map.floor, {Sentry: 1})
-        self.map.floor.set_cell(Door(self.map.find_open_point()))
         self.context = Context()
-        self.player = Player(self.map.find_open_point(), self.map, self)
+        try:
+            self.map = Map(self)
+        except Exception as err:
+            # This is here for debugging purposes
+            pass
+
+        self.player = self.map.player
         self.input = Input(self.player, self.context, self)
 
     @property
@@ -186,7 +175,7 @@ class GameScene(PrintScene):
 
     @property
     def relative_pos(self) -> Point:
-        return self.player.relative_position + self.map.center
+        return self.player.relative_position + self.map.view_center
 
     @property
     def bounds(self) -> Rect:
@@ -251,8 +240,8 @@ class GameScene(PrintScene):
             if self.input.handle_key(val):
                 self.player.turn()
                 for entity in self.entities:
-                    if entity.type == EntityType.ENEMY and entity.ai_behavior():
-                        entity.turn()
+                    if entity.type == EntityType.ENEMY:
+                        entity.ai_behavior()
                 self.time.tick()
 
     def terminal_update(self, is_active: bool = False) -> None:

@@ -2,7 +2,7 @@ from clubsandwich.tilemap import Cell
 from clubsandwich.geom import Point
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 from enum import Enum
 from abc import ABC
 
@@ -46,6 +46,7 @@ class Tile(Cell, ABC):
         self.color = self.COLOR if self.COLOR is not None else self.window.fg_color
         self._open = self.OPEN
         self.terrain = self.TERRAIN
+        self._floor = None
 
         self.entities = []
 
@@ -53,6 +54,14 @@ class Tile(Cell, ABC):
         context.color(self.color)
         context.put(self.point, self.glyph)
         context.color(self.window.fg_color)
+
+    @property
+    def floor(self):
+        return self._floor
+
+    @floor.setter
+    def floor(self, value: 'Floor'):
+        self._floor = value
 
     @property
     def glyph(self):
@@ -63,12 +72,16 @@ class Tile(Cell, ABC):
         return self._block or any(entity.blocking for entity in self.entities)
 
     @property
+    def block_sight(self):
+        return self._block_sight or any(entity.type.value == 'enemy' for entity in self.entities)
+
+    @property
     def occupied(self):
         return len(self.entities) > 0
 
     @property
     def open(self):
-        return self._open or self.block
+        return self._open or not self.block
 
     def interact(self):
         pass
@@ -85,7 +98,6 @@ class FloorTile(Tile):
 
 
 class Stairs(Tile, ABC):
-
     OPEN = False
 
     def __init__(self, point: Point):
@@ -95,10 +107,10 @@ class Stairs(Tile, ABC):
         self._floor_index = None
 
     @property
-    def floor(self):
+    def floor_index(self):
         return self._floor_index
 
-    def interact(self) -> Tile:
+    def interact(self) -> 'Stairs':
         return self.dest_tile
 
     def set_destination(self, dest: 'Stairs', floor_index: int, dest_floor_index: int, link: bool = False) -> None:
