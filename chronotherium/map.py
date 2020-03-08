@@ -89,14 +89,21 @@ class Floor(TileMap):
         origin = tile1.point
         dest = origin.get_closest_point([neighbor for neighbor in tile2.point.neighbors])
         self.hallway_tile(origin, doors)
-        for point in origin.path_L_to(dest):
-            self.hallway_tile(point, doors)
+        if manhattan:
+            for point in origin.path_L_to(dest):
+                self.hallway_tile(point, doors)
+        else:
+            for point in origin.points_bresenham_to(dest):
+                self.hallway_tile(point, doors)
         self.hallway_tile(dest, doors)
 
     def hallway_tile(self, point, doors=True):
         if isinstance(self.cell(point), Wall):
             if doors:
-                tile = Door(point)
+                if any([neighbor for neighbor in point.neighbors if isinstance(neighbor, Door)]):
+                    return
+                else:
+                    tile = Door(point)
             else:
                 if isinstance(self.cell(point), Door):
                     return
@@ -116,7 +123,7 @@ class Floor(TileMap):
                 halls = randint(2, 4)
                 for i in range(0, halls):
                     tile1 = self.cell(self.find_open_point(rect=node1.rect.with_inset(1)))
-                    tile2 = self.cell(self.find_open_point(rect=node1.rect.with_inset(1)))
+                    tile2 = self.cell(self.find_open_point(rect=node2.rect.with_inset(1)))
                     self.connect_tiles(tile1, tile2)
             node1.data['connected_to_sibling'] = True
             node2.data['connected_to_sibling'] = True
@@ -144,13 +151,13 @@ class Floor(TileMap):
 
     def create_hallway(self, room1: Rect, room2: Rect, horiz=False) -> None:
 
-        halls = randint(1, 3)
+        halls = randint(2, 3)
         for i in range(0, halls):
             if not horiz:
                 top = [point for point in room1.points_top]
                 edge_point = top[randrange(0, len(top))]
                 closest_point = edge_point.get_closest_point([p for p in room2.points])
-                if room2.contains(next(edge_point.path_L_to(closest_point))):
+                if room2.with_inset(1).contains(next(edge_point.path_L_to(closest_point))):
                     bottom = [point for point in room1.points_bottom]
                     edge_point = bottom[randrange(0, len(bottom))]
                     closest_point = edge_point.get_closest_point([p for p in room2.points])
@@ -161,7 +168,7 @@ class Floor(TileMap):
                 right = [point for point in room1.points_right]
                 edge_point = right[randrange(0, len(right))]
                 closest_point = edge_point.get_closest_point([p for p in room2.points])
-                if room2.contains(next(edge_point.path_L_to(closest_point))):
+                if room2.with_inset(1).contains(next(edge_point.path_L_to(closest_point))):
                     left = [point for point in room1.points_left]
                     edge_point = left[randrange(0, len(left))]
                     closest_point = edge_point.get_closest_point([p for p in room2.points])
@@ -174,38 +181,6 @@ class Floor(TileMap):
         height = randint(self.room_min, self.room_max)
         origin = self.find_empty_point()
         return Rect(origin, Size(width, height))
-
-    # def place_wall(self, point: Point, orientation: Orientation):
-    #     if self.area.contains(point):
-    #         if isinstance(self.cell(point), Empty):
-    #             self.set_cell(Wall(point, orientation))
-    #         elif isinstance(self.cell(point), Wall):
-    #             try:
-    #                 corner_map = {
-    #                     (Point(-1, 0), Point(0, -1)): Orientation.BOTTOM_RIGHT,
-    #                     (Point(0, -1), Point(1, 0)): Orientation.BOTTOM_LEFT,
-    #                     (Point(1, 0), Point(0, 1)): Orientation.TOP_LEFT,
-    #                     (Point(0, 1), Point(-1, 0)): Orientation.TOP_RIGHT,
-    #                 }
-    #                 left_point, up_point, right_point, down_point = point.neighbors
-    #                 neighbor_tiles = {
-    #                     left_point: self.cell(left_point),
-    #                     up_point: self.cell(up_point),
-    #                     right_point: self.cell(right_point),
-    #                     down_point: self.cell(down_point)
-    #                 }
-    #                 floors = [point for point in neighbor_tiles if isinstance(neighbor_tiles[point], FloorTile)]
-    #                 walls = [point for point in neighbor_tiles if isinstance(neighbor_tiles[point], Wall)]
-    #                 if len(floors) == 2 and len(walls) == 2:
-    #                     wall_deltas = (walls[0] - point, walls[1] - point)
-    #                     try:
-    #                         orientation = corner_map[wall_deltas]
-    #                     except KeyError:
-    #                         return
-    #                     self.set_cell(Wall(point, orientation))
-    #
-    #             except CellOutOfBoundsError:
-    #                 pass
 
     def place_room(self, room: Rect, no_floor: bool = False):
         if not no_floor:
@@ -238,7 +213,7 @@ class Map:
     FLOOR_SIZE = MAP_SIZE
     VIEW_SIZE = VIEW_SIZE
     ORIGIN = MAP_ORIGIN
-    ENEMY_DENSITY = 25
+    ENEMY_DENSITY = 30
 
     __enemies = [Golem, Sentry, Knight]
 
@@ -260,8 +235,7 @@ class Map:
 
         for i in range(0, self.FLOORS):
             self.__floors[i] = Floor(self._origin, self._floor_size)
-            density = self.ENEMY_DENSITY - 2 * i
-            self.populate_floor(self.__floors[i], density)
+            self.populate_floor(self.__floors[i])
 
         for index in self.__floors:
             floor = self.__floors.get(index + 1)
@@ -282,10 +256,11 @@ class Map:
         Chronotherium(chronotherium_start_tile, self, self.scene)
         last_floor.connect_tiles(chronotherium_start_tile, last_floor.stairs_down)
 
-    def populate_floor(self, floor, density):
-        total_enemies = int(len(floor.get_open_tiles()) / density)
+    def populate_floor(self, floor):
+        total_enemies = int(len(floor.get_open_tiles()) / self.ENEMY_DENSITY)
         for enemy in self.__enemies:
-            for i in range(0, int(total_enemies / len(self.__enemies))):
+            specific_density = enemy.DENSITY
+            for i in range(0, int(total_enemies * specific_density)):
                 tile = floor.cell(floor.find_open_point())
                 enemy(tile, self, self.scene)
 
@@ -345,17 +320,36 @@ class Map:
         return found
 
     def find_in_bounds_orthogonal(self, point: Point, delta: int = 1) -> Point:
-        to_check = [Point(0, -delta), Point(delta, 0), Point(0, delta), Point(-delta, 0)]
-        for check in to_check:
-            if self.floor.area.contains(point + check):
-                return point + check
+        if delta == 1:
+            to_check = point.neighbors
+            for check in to_check:
+                try:
+                    if self.floor.contains_point(check):
+                        return check
+                except CellOutOfBoundsError:
+                    continue
+        else:
+            to_check = [Point(0, -delta), Point(delta, 0), Point(0, delta), Point(-delta, 0)]
 
-    def diagonals(self, point: Point, delta: int = 2) -> List[Point]:
-        to_check = [Point(-delta, -delta), Point(delta, delta), Point(delta, -delta), Point(-delta, delta)]
+            for check in to_check:
+                try:
+                    if self.floor.contains_point(point + check):
+                        return point + check
+                except CellOutOfBoundsError:
+                    continue
+
+        # Don't return None, just in case
+        return point
+
+    def diagonals(self, point: Point, delta: int = 2) -> List[Tile]:
+        to_check = [neighbor for neighbor in point.diagonal_neighbors]
+        to_check.extend([Point(-delta, -delta), Point(delta, delta), Point(delta, -delta), Point(-delta, delta)])
         safe = []
         for check in to_check:
-            if self.floor.area.contains(point + check):
-                safe.append(point + check)
+            try:
+                safe.append(self.floor.cell(point + check))
+            except CellOutOfBoundsError:
+                pass
         return safe
 
     def move_floors(self, floor: Floor):

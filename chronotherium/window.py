@@ -7,6 +7,12 @@ import sys
 import os
 
 
+if getattr(sys, 'frozen', False):
+    RESOURCE_PATH = './'
+else:
+    RESOURCE_PATH = '../resources'
+
+
 # Source: https://stackoverflow.com/a/44352931
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -34,16 +40,13 @@ class Color:
 
 
 TITLE = "Chronotherium - 2020 7DRL"
-WINDOW_WIDTH = 60
-WINDOW_HEIGHT = 45
+WINDOW_WIDTH = 50
+WINDOW_HEIGHT = 42
 ENCODING = 'utf-8'
 SPACING = '1x1'
-FONT = resource_path('../resources/VeraMono.ttf')
-SYMBOLA_FONT = resource_path('../resources/ttf-symbola/Symbola.ttf')
-SYMBOLA_CODEPAGE = resource_path('../resources/symbola_codepage.txt')
-HAN_FONT = resource_path('../resources/babelstone-han/BabelStoneHan.ttf')
-HAN_CODEPAGE = resource_path('../resources/han_codepage.txt')
-TITLE_FONT = resource_path('../resources/CinzelDecorative-Regular.ttf')
+FONT = resource_path(os.path.join(RESOURCE_PATH, 'VeraMono.ttf'))
+SYMBOLA_FONT = resource_path(os.path.join(RESOURCE_PATH, 'ttf-symbola/Symbola.ttf'))
+SYMBOLA_CODEPAGE = resource_path(os.path.join(RESOURCE_PATH, 'symbola_codepage.txt'))
 FONT_SIZE = '18x18'
 CELL_SIZE = '20x20'
 FG_COLOR = Color.BASE1
@@ -51,7 +54,7 @@ BG_COLOR = Color.BASE03
 # Option to draw UI rectangles
 RECTANGLES = False
 MAP_SIZE = Size(30, 30)
-VIEW_SIZE = Size(40, 30)
+VIEW_SIZE = Size(20, 20)
 MAP_ORIGIN = Point(1, 7)
 LOG_HEIGHT = MAP_ORIGIN.y - 1
 
@@ -89,8 +92,6 @@ class Window:
         self.bg_color = BG_COLOR
         self.symbol_str = f'0xE000: {SYMBOLA_FONT}, size={self.font_size}, align=center, spacing={self.spacing}, '\
                           f'codepage={SYMBOLA_CODEPAGE}; '
-        self.tally_str = f'0xE001: {HAN_FONT}, size={self.font_size}, align=center, spacing={self.spacing}, '\
-                         f'codepage={HAN_CODEPAGE}; '
         self.config_str = f'terminal: encoding={self.encoding}; ' \
                           f'font: {self.font}, size={self.font_size}, align=center, spacing={self.spacing}; ' \
                           f'window: size={self.dimensions} title={self.title}, cellsize={self.cell_size}; ' \
@@ -104,4 +105,3 @@ class Window:
         bearlib.bkcolor(self.bg_color)
         bearlib.set(self.config_str)
         bearlib.set(self.symbol_str)
-        bearlib.set(self.tally_str)

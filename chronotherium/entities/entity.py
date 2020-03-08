@@ -2,6 +2,8 @@ from abc import ABC
 from logging import getLogger
 from typing import Optional, Union, TYPE_CHECKING
 
+from random import random
+
 from bearlibterminal import terminal as bearlib
 
 from chronotherium.tiles.tile import Stairs, Tile, Door
@@ -30,6 +32,7 @@ class ActorState(Enum):
 class EnemyMode(Enum):
     WANDER = 'wander'
     ATTACK = 'attack'
+    STUNNED = 'stunned'
 
 
 class EntityType(Enum):
@@ -113,7 +116,7 @@ class Entity(ABC):
         return self.map.origin - self._pos
 
     def draw(self, context):
-        if context.state(bearlib.TK_COLOR) == self.color:
+        if bearlib.state(bearlib.TK_COLOR) == int(self.color):
             context.color(self.window.fg_color)
         else:
             context.color(self.color)
@@ -173,25 +176,26 @@ class Actor(Entity, ABC):
         self._states = {}
         self._visible_points = get_visible_points(self.position, self.map.get_allows_light, max_distance=self._range)
 
-
     def actor_move(self, delta: Point):
         try:
             target_point = self._pos + delta
+            if target_point == self._pos:
+                return True
+
             dest_cell = self._floor.cell(target_point)
-            # Don't let enemies move onto stairs
             if self.type == EntityType.ENEMY and isinstance(dest_cell, Stairs):
+                # Don't let enemies move onto stairs
                 return True
             if dest_cell.block and dest_cell.occupied:
                 for entity in dest_cell.entities:
                     if self.type == EntityType.PLAYER and entity.type == EntityType.ENEMY:
                         return self.bump(entity)
-                    if self.type == EntityType.ENEMY and entity.type == EntityType.PLAYER:
+                    elif self.type == EntityType.ENEMY and entity.type == EntityType.PLAYER:
                         self.bump(entity)
             elif dest_cell.block:
                 if isinstance(dest_cell, Door):
                     dest_cell.interact()
-                    return True
-                return False
+                return True
             else:
                 self.delta_pos = delta
                 self.unblock()
@@ -274,25 +278,27 @@ class Actor(Entity, ABC):
 
     def update_hp(self):
         if self.delta_hp != 0:
-            if self.hp + self.delta_hp >= 0:
-                self._hp += self.delta_hp
-            if self.hp == 0:
-                self.state = ActorState.DEAD
+            self._hp += self.delta_hp
+        if self.hp <= 0:
+            self.state = ActorState.DEAD
         self.delta_hp = 0
 
     def update_tp(self):
         if self.delta_tp != 0:
             if self.tp + self.delta_tp >= 0:
                 self._tp += self.delta_tp
+            else:
+                self._tp = 0
             self.delta_tp = 0
 
     def update_pos(self):
+        self.unblock()
         if self.delta_pos != Point(0, 0):
-            self.unblock()
             self._pos += self.delta_pos
             bearlib.clear(self._pos.x, self._pos.y, 1, 1)
-            self.update_block()
-            self._visible_points = get_visible_points(self.position, self.map.get_allows_light, max_distance=self._range)
+            self._visible_points = get_visible_points(self.position, self.map.get_allows_light,
+                                                      max_distance=self._range)
+        self.update_block()
         self.delta_pos = Point(0, 0)
 
     def update_xp(self):
@@ -371,19 +377,36 @@ class Enemy(Actor, ABC):
     TYPE = EntityType.ENEMY
     DROP = None
     XP = None
+    DROP_CHANCE = 0
 
     def __init__(self, tile: Tile, map, scene):
         super().__init__(tile, map, scene)
         self._drop = self.DROP
+        self._drop_chance = self.DROP_CHANCE
         self._xp = self.XP
         self._mode = EnemyMode.WANDER
         self._floor.entities.append(self)
 
     @property
+    def mode(self):
+        return self._mode
+
+    @mode.setter
+    def mode(self, value):
+        self._mode = value
+
+    @property
     def drop(self):
         return self._drop
 
+    @property
+    def drop_chance(self):
+        return self._drop_chance
+
     def ai_behavior(self):
+        if self._mode == EnemyMode.STUNNED:
+            self._mode = EnemyMode.WANDER
+            return False
         if self.in_range(self.scene.player) and self.visible_to(self.scene.player):
             self._mode = EnemyMode.ATTACK
         else:
@@ -405,8 +428,9 @@ class Enemy(Actor, ABC):
                     self.actor_move(dest - self.position)
                 else:
                     try:
-                        dest = self.scene.player.position.get_closest_point([neighbor for neighbor in all_neighbors
-                                                                            if self.map.floor.cell(neighbor).open])
+                        dest = self.scene.player.position\
+                            .get_closest_point([neighbor for neighbor in all_neighbors
+                                                if self.map.floor.cell(neighbor).open])
                         self.actor_move(dest - self.position)
                     except IndexError:
                         pass
@@ -419,7 +443,7 @@ class Enemy(Actor, ABC):
 
     def drop_item(self):
         if self.drop is not None:
-            if d6(limit=0, over=True):
+            if random() <= self._drop_chance:
                 item = self.drop(self.tile, self.map, self.scene)
                 item.update_block()
 

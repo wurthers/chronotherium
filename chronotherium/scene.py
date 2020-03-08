@@ -1,12 +1,12 @@
-from typing import List
+from typing import List, Optional
 
 from bearlibterminal import terminal as bearlib
 
-from clubsandwich.geom import Rect, Point
+from clubsandwich.geom import Rect, Point, Size
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.director import Scene
 
-from chronotherium.window import Window, Color, LOG_HEIGHT
+from chronotherium.window import Window, Color, LOG_HEIGHT, MAP_SIZE, MAP_ORIGIN
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, ActorState, EntityType
 from chronotherium.input import Input
@@ -19,6 +19,11 @@ class PrintScene(Scene):
         self.window = Window()
         self.message_log = []
         self.gutter = []
+        self.gutter_size = Size(self.window.width - MAP_SIZE.width + MAP_ORIGIN.x,
+                                self.window.height - MAP_ORIGIN.y)
+        self.gutter_rect = Rect(Point(self.window.width - self.gutter_size.width,
+                                      self.window.height - self.gutter_size.height),
+                                self.gutter_size)
         self.log_height = LOG_HEIGHT
         super().__init__()
 
@@ -131,13 +136,14 @@ class FlavorScene(PrintScene):
         super().__init__()
 
     def terminal_update(self, is_active: bool = False):
-        self.pprint_center(["You return to the Palace in an entirely",
-                            "new WHEN that feels all to familiar.",
-                            "The time beast has once again thwarted you,",
-                            "as it has done many times before.",
-                            "How long have you pursued it through these halls,",
-                            "subdividing time into seconds proceeding by your will alone?",
-                            "(Space to Continue)"])
+        self.pprint_center(["You return to the palace in a new when,",
+                            "but it feels feels all too familiar.", "",
+                            "The beast has thwarted you once again,",
+                            "as it has done so many times before.",
+                            "How long have you pursued it through these halls?", "",
+                            "How many countless seconds,",
+                            "subdividing eternity?", "",
+                            "(Press Space to Continue)"])
 
     def terminal_read(self, val):
         try:
@@ -159,6 +165,8 @@ class GameScene(PrintScene):
     def __init__(self):
         super().__init__()
 
+        self.pprint_center(["Generating..."])
+
         self.__input_map = {
             bearlib.TK_Q: self.quit,
             bearlib.TK_ESCAPE: self.quit
@@ -173,6 +181,7 @@ class GameScene(PrintScene):
 
         self.player = self.map.player
         self.input = Input(self.player, self.context, self)
+        self.update_skills()
 
     @property
     def entities(self):
@@ -222,7 +231,7 @@ class GameScene(PrintScene):
             tp = self.player.tp
         hp_string = f'HP: {"|" * hp}{" " * (self.player.max_hp - self.player.hp)} '\
                     f'({self.player.hp}/{self.player.max_hp})'
-        tp_string = f'TP: {"|" * tp}{" " * (self.player.max_tp - self.player.tp)} '\
+        tp_string = f'MP: {"|" * tp}{" " * (self.player.max_tp - self.player.tp)} '\
                     f'({self.player.tp}/{self.player.max_tp})'
         xp_string = f'XP: {self.player.xp} - Level {self.player.level}'
         time_string = f'{"<" if left_arrow else " "}Time: {self.time.clock(tick)}{">" if right_arrow else ""}'
@@ -236,8 +245,21 @@ class GameScene(PrintScene):
         self.pprint(corner.x, corner.y + 4, time_string)
         bearlib.color(self.window.fg_color)
 
-    def print_gutter(self):
-        pass
+    def update_skills(self):
+        skill_strings = []
+        for skill in self.player.skills:
+            skill_string = f"{skill.NAME} ({skill.COST} MP): {skill.KEY}"
+            skill_desc = f"{skill.DESCRIPTION}"
+            skill_strings.extend([skill_string, skill_desc, ""])
+
+        self.gutter = skill_strings
+
+    def print_gutter(self, strings: Optional[List[str]] = None):
+        if strings is None:
+            strings = self.gutter
+        for i in range(0, len(strings)):
+            string = strings[i]
+            self.pprint(self.gutter_rect.x, self.gutter_rect.y + i, string)
 
     def terminal_read(self, val) -> None:
         if val in self.__input_map:
@@ -270,6 +292,7 @@ class GameScene(PrintScene):
             self.player.draw(self.context)
             self.print_stats()
             self.print_log()
+            self.print_gutter()
             bearlib.refresh()
 
 

@@ -4,9 +4,11 @@ block_cipher = None
 
 
 a = Analysis(['chronotherium/main.py'],
-             pathex=['./chronotherium'],
+             pathex=['./chronotherium', './clubsandwich'],
              binaries=[('shared/libBearLibTerminal.so', '.')],
-	     datas=[],
+      	     datas=[('./resources/VeraMono.ttf', '.'),
+                    ('./resources/ttf-symbola/Symbola.ttf', '.'),
+                    ('./resources/symbola_codepage.txt', '.')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],

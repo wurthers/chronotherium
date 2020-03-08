@@ -4,7 +4,7 @@ from random import randrange
 
 from bearlibterminal import terminal as bearlib
 
-from chronotherium.entities.entity import EntityType
+from chronotherium.entities.entity import EntityType, EnemyMode
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 from clubsandwich.geom import Point
 from clubsandwich.tilemap import CellOutOfBoundsError
@@ -172,7 +172,7 @@ class Input:
 
         self.player.record()
         if self.player.tp < self.player.rewind_cost:
-            self.scene.log(f'Not enough tp to rewind (costs {self.player.rewind_cost} TP)')
+            self.scene.log(f"You don't have enough mana to rewind.")
             return False
 
         true_tick = self.time.time
@@ -255,7 +255,7 @@ class Input:
             return False
 
         if self.player.tp < self.player.freeze_cost:
-            self.scene.log(f'Not enough tp to cast freeze (costs {self.player.freeze_cost} TP)')
+            self.scene.log(f"You don't have enough mana to cast freeze.")
             return False
 
         target_square = self.scene.map.find_in_bounds_orthogonal(self.player.position)
@@ -278,6 +278,7 @@ class Input:
                     turns = randrange(1, 3)
                     # +1 -- Account for this current turn
                     enemy.freeze(turns + 2)
+                    enemy.delta_hp -= self.player.freeze_damage
                     self.scene.log(f'You freeze the {enemy.name} in suspended animation. {enemy.hp}/{enemy.max_hp}')
                     return True
                 else:
@@ -311,7 +312,7 @@ class Input:
             return
 
         if self.player.tp < self.player.push_cost:
-            self.scene.log(f'Not enough tp to open a wormhole (costs {self.player.push_cost} TP)')
+            self.scene.log(f"You don't have enough mana to open a wormhole.")
             return False
 
         target_square = self.scene.map.find_in_bounds_orthogonal(self.player.position, delta=2)
@@ -328,7 +329,11 @@ class Input:
         key = bearlib.read()
         while key != bearlib.TK_ESCAPE:
             if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
-                target_tile = self.scene.map.floor.cell(target_square)
+                try:
+                    target_tile = self.scene.map.floor.cell(target_square)
+                except CellOutOfBoundsError:
+                    key = bearlib.read()
+                    continue
                 enemy = None
                 for entity in target_tile.entities:
                     if entity.type == EntityType.ENEMY:
@@ -338,9 +343,12 @@ class Input:
                     self.player.delta_tp -= self.player.push_cost
                     self.player.update_tp()
 
-                    enemy.delta_hp -= self.player.push_damage
                     delta = self.__delta_map[direction]
                     tile = self.scene.map.floor.cell(enemy.position + delta)
+
+                    enemy.mode = EnemyMode.STUNNED
+                    enemy.delta_hp -= self.player.push_damage
+
                     if tile.block:
                         enemy.delta_hp -= 1
                     else:
@@ -361,11 +369,7 @@ class Input:
 
             # Clears background from previous tile.
             bearlib.bkcolor(self.window.bg_color)
-            try:
-                target_tile.draw_tile(self.context)
-            except CellOutOfBoundsError:
-                key = bearlib.read()
-                continue
+            target_tile.draw_tile(self.context)
 
             delta = self.__delta_map[direction] * 2
             target_square = self.player.position + delta
@@ -388,13 +392,13 @@ class Input:
             return
 
         if self.player.tp < self.player.diagonal_cost:
-            self.scene.log(f'Not enough tp to cast Event Horizon! (costs {self.player.diagonal_cost} TP)')
+            self.scene.log(f"You don't have enough mana to cast Event Horizon.")
             return False
 
         targets = self.scene.map.diagonals(self.player.position)
         bearlib.bkcolor(Color.YELLOW)
         for target in targets:
-            self.scene.map.floor.cell(target).draw_tile(self.context)
+            target.draw_tile(self.context)
         bearlib.bkcolor(self.window.bg_color)
         bearlib.refresh()
 
@@ -403,21 +407,18 @@ class Input:
             if key == bearlib.TK_ENTER or key == bearlib.TK_SPACE:
                 enemies = []
                 for target in targets:
-                    for entity in self.scene.map.floor.cell(target).entities:
+                    for entity in target.entities:
                         if entity.type == EntityType.ENEMY:
                             enemies.append(entity)
                         break
-                if enemies:
-                    self.player.delta_tp -= self.player.diagonal_cost
-                    self.player.update_tp()
+                self.player.delta_tp -= self.player.diagonal_cost
+                self.player.update_tp()
 
-                    for enemy in enemies:
-                        enemy.delta_hp -= self.player.diagonal_damage
-                        enemy.update_hp()
-                    self.scene.log(f'You conjure a swarm of ephemeral black holes.')
-                    return True
-                else:
-                    return False
+                for enemy in enemies:
+                    enemy.delta_hp -= self.player.diagonal_damage
+                    enemy.update_hp()
+                self.scene.log(f'You conjure a swarm of ephemeral black holes.')
+                return True
             key = bearlib.read()
 
     def teleport(self):
@@ -425,7 +426,7 @@ class Input:
             return
 
         if self.player.tp < self.player.teleport_cost:
-            self.scene.log(f'Not enough tp to teleport (costs {self.player.teleport_cost} TP)')
+            self.scene.log(f"You don't have enough mana to teleport.")
             return False
 
         self.player.delta_tp -= self.player.teleport_cost
