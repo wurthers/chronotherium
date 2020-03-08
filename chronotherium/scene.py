@@ -201,12 +201,13 @@ class GameScene(PrintScene):
     def draw_tiles(self):
         for cell in self.map.floor.cells:
             if self.bounds.contains(cell.point + self.relative_pos):
-                if not cell.occupied:
+                if not cell.occupied and self.player.in_sight(cell):
                     cell.draw_tile(self.context)
 
     def draw_entities(self):
         for entity in self.entities:
-            entity.draw(self.context)
+            if self.player.visible_to(entity):
+                entity.draw(self.context)
 
     def print_stats(self, hp: int = None, tp: int = None, tick: int = None, left_arrow: bool = False,
                     right_arrow: bool = False):
@@ -245,8 +246,9 @@ class GameScene(PrintScene):
             if self.input.handle_key(val):
                 self.player.turn()
                 for entity in self.entities:
-                    if entity.type == EntityType.ENEMY:
-                        entity.ai_behavior()
+                    if self.bounds.contains(entity.position + self.relative_pos):
+                        if entity.type == EntityType.ENEMY:
+                            entity.ai_behavior()
                 self.time.tick()
 
     def terminal_update(self, is_active: bool = False) -> None:
@@ -263,7 +265,8 @@ class GameScene(PrintScene):
                         self.entities.remove(entity)
                         continue
                 if self.bounds.contains(entity.position + self.relative_pos):
-                    entity.draw(self.context)
+                    if self.player.visible_to(entity):
+                        entity.draw(self.context)
             self.player.draw(self.context)
             self.print_stats()
             self.print_log()

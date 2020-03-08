@@ -12,9 +12,11 @@ from clubsandwich.tilemap import CellOutOfBoundsError
 from chronotherium.tiles.tile import Door, Stairs, StairsUp
 from chronotherium.time import Time, TimeError
 from chronotherium.window import Window, Color
+from chronotherium.entities.player import Rewind, Freeze, Push, Diagonal, Teleport
 
 if TYPE_CHECKING:
-    from chronotherium.scene import GameScene, Player
+    from chronotherium.scene import GameScene
+    from chronotherium.entities.player import Player
 
 
 class Direction(Enum):
@@ -55,6 +57,7 @@ class Command(Enum):
     PICKUP_G = bearlib.TK_G
     LOOK = bearlib.TK_SEMICOLON
     OPEN = bearlib.TK_O
+    TELEPORT = bearlib.TK_T
 
 
 class ShiftCommand(Enum):
@@ -83,11 +86,11 @@ class Input:
             Command.PUSH: self.push,
             Command.DIAGONAL: self.diagonal,
             Command.FREEZE: self.freeze,
-            Command.WORMHOLE: self.wormhole,
             Command.PICKUP: self.pickup,
             Command.PICKUP_G: self.pickup,
             Command.LOOK: self.look,
-            Command.OPEN: self.open
+            Command.OPEN: self.open,
+            Command.TELEPORT: self.teleport
         }
 
         self.__shift_command_map = {
@@ -160,6 +163,8 @@ class Input:
         pass
 
     def rewind(self):
+        if not self.player.has_skill(Rewind):
+            return
         state = None
 
         right_arrow = False
@@ -246,6 +251,13 @@ class Input:
         return False
 
     def freeze(self):
+        if not self.player.has_skill(Freeze):
+            return False
+
+        if self.player.tp < self.player.freeze_cost:
+            self.scene.log(f'Not enough tp to cast freeze (costs {self.player.freeze_cost} TP)')
+            return False
+
         target_square = self.scene.map.find_in_bounds_orthogonal(self.player.position)
         bearlib.bkcolor(Color.BLUE)
         self.scene.map.floor.cell(target_square).draw_tile(self.context)
@@ -266,7 +278,7 @@ class Input:
                     turns = randrange(1, 3)
                     # +1 -- Account for this current turn
                     enemy.freeze(turns + 2)
-                    self.scene.log(f'You freeze the {enemy.name} in suspended animation.')
+                    self.scene.log(f'You freeze the {enemy.name} in suspended animation. {enemy.hp}/{enemy.max_hp}')
                     return True
                 else:
                     self.scene.log("There's nothing there to freeze.")
@@ -295,6 +307,13 @@ class Input:
             key = bearlib.read()
 
     def push(self):
+        if not self.player.has_skill(Push):
+            return
+
+        if self.player.tp < self.player.push_cost:
+            self.scene.log(f'Not enough tp to open a wormhole (costs {self.player.push_cost} TP)')
+            return False
+
         target_square = self.scene.map.find_in_bounds_orthogonal(self.player.position, delta=2)
         self.context.bkcolor(Color.MAGENTA)
         target_tile = self.scene.map.floor.cell(target_square)
@@ -365,6 +384,13 @@ class Input:
             key = bearlib.read()
 
     def diagonal(self):
+        if not self.player.has_skill(Diagonal):
+            return
+
+        if self.player.tp < self.player.diagonal_cost:
+            self.scene.log(f'Not enough tp to cast Event Horizon! (costs {self.player.diagonal_cost} TP)')
+            return False
+
         targets = self.scene.map.diagonals(self.player.position)
         bearlib.bkcolor(Color.YELLOW)
         for target in targets:
@@ -394,8 +420,18 @@ class Input:
                     return False
             key = bearlib.read()
 
-    def wormhole(self):
-        pass
+    def teleport(self):
+        if not self.player.has_skill(Teleport):
+            return
+
+        if self.player.tp < self.player.teleport_cost:
+            self.scene.log(f'Not enough tp to teleport (costs {self.player.teleport_cost} TP)')
+            return False
+
+        self.player.delta_tp -= self.player.teleport_cost
+        dest = self.scene.map.floor.find_open_point()
+        self.player.delta_pos = dest - self.player.position
+        return True
 
     def pickup(self):
         entities = self.player.tile.entities

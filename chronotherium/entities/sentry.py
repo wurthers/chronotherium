@@ -9,8 +9,9 @@ class Sentry(Enemy):
     DESCRIPTION = "An ornate biped set to forever guard the halls of the Palace."
     NAME = "Eternal Sentry"
     GLYPH = ActorType.SENTRY
-    BASE_HP = 4
+    BASE_HP = 3
     BASE_TP = 0
-    XP = 2
+    RANGE = 3
+    XP = 3
     COLOR = Color.BASE2
     DROP = HealthPotion

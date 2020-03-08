@@ -11,6 +11,7 @@ class Knight(Enemy):
     GLYPH = ActorType.KNIGHT
     BASE_HP = 2
     BASE_TP = 0
+    RANGE = 9
     XP = 1
     COLOR = Color.GREEN
     DROP = HealthPotion

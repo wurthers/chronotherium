@@ -12,8 +12,9 @@ class Chronotherium(Enemy):
     NAME = "Chronotherium"
     DESCRIPTION = "A hulking mass of intricate, shimmering filigree."
     GLYPH = ActorType.BEAST
-    BASE_HP = 1
+    BASE_HP = 25
     BASE_TP = 7
+    RANGE = 25
     XP = 5
     COLOR = Color.MAGENTA
     DROP = Hourglass

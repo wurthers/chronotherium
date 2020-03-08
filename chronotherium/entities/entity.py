@@ -4,8 +4,9 @@ from typing import Optional, Union, TYPE_CHECKING
 
 from bearlibterminal import terminal as bearlib
 
-from chronotherium.tiles.tile import Stairs, Tile
-from clubsandwich.geom import Point
+from chronotherium.tiles.tile import Stairs, Tile, Door
+from clubsandwich.geom import Point, Rect, Size
+from clubsandwich.line_of_sight import get_visible_points
 from clubsandwich.tilemap import CellOutOfBoundsError
 from clubsandwich.blt.context import BearLibTerminalContext as Context
 
@@ -29,7 +30,6 @@ class ActorState(Enum):
 class EnemyMode(Enum):
     WANDER = 'wander'
     ATTACK = 'attack'
-    STUNNED = 'stunned'
 
 
 class EntityType(Enum):
@@ -140,6 +140,7 @@ class Actor(Entity, ABC):
     BASE_HP = 0
     BASE_TP = 0
     LAYER = 2
+    RANGE = 0
 
     class State:
 
@@ -149,6 +150,7 @@ class Actor(Entity, ABC):
             self.pos = actor.position
 
     def __init__(self, tile: Tile, map: 'Map', scene: 'GameScene'):
+        super().__init__(tile, map, scene)
         self.name = self.NAME
         self.description = self.DESCRIPTION
         self._hp = self.BASE_HP
@@ -157,6 +159,7 @@ class Actor(Entity, ABC):
         self._max_tp = self.BASE_TP
         self._xp = 0
         self._bump_damage = 1
+        self._range = self.RANGE
 
         self.frozen = 0
         self.state = ActorState.ALIVE
@@ -168,8 +171,8 @@ class Actor(Entity, ABC):
         self.delta_xp = 0
 
         self._states = {}
+        self._visible_points = get_visible_points(self.position, self.map.get_allows_light, max_distance=self._range)
 
-        super().__init__(tile, map, scene)
 
     def actor_move(self, delta: Point):
         try:
@@ -185,6 +188,9 @@ class Actor(Entity, ABC):
                     if self.type == EntityType.ENEMY and entity.type == EntityType.PLAYER:
                         self.bump(entity)
             elif dest_cell.block:
+                if isinstance(dest_cell, Door):
+                    dest_cell.interact()
+                    return True
                 return False
             else:
                 self.delta_pos = delta
@@ -192,6 +198,24 @@ class Actor(Entity, ABC):
                 return True
         except CellOutOfBoundsError:
             return False
+
+    def visible_to(self, other: Entity) -> bool:
+        return other.position in self._visible_points
+
+    def in_sight(self, tile: Tile) -> bool:
+        return tile in self.visible_tiles
+
+    def in_range(self, other):
+        range_rect = Rect(self.position - Point(self._range, self._range), Size(self._range * 2, self._range * 2))
+        return range_rect.contains(other.position)
+
+    @property
+    def visible_tiles(self):
+        return [self.map.floor.cell(point) for point in self._visible_points]
+
+    @property
+    def range(self):
+        return self._range
 
     @property
     def max_hp(self):
@@ -220,6 +244,9 @@ class Actor(Entity, ABC):
     @property
     def bump_damage(self):
         return self._bump_damage
+
+    def level_up(self):
+        pass
 
     def record(self):
         tick = self.time.time
@@ -265,11 +292,13 @@ class Actor(Entity, ABC):
             self._pos += self.delta_pos
             bearlib.clear(self._pos.x, self._pos.y, 1, 1)
             self.update_block()
+            self._visible_points = get_visible_points(self.position, self.map.get_allows_light, max_distance=self._range)
         self.delta_pos = Point(0, 0)
 
     def update_xp(self):
         self._xp += self.delta_xp
         self.delta_xp = 0
+        self.level_up()
 
     def clear_states(self):
         self._states = {}
@@ -320,7 +349,7 @@ class Actor(Entity, ABC):
     def bump(self, target):
         if d6():
             target.delta_hp -= self.bump_damage
-            player_message = f"You use your regular meat hands to pummel the {target.name}. "\
+            player_message = f"You use your regular meat hands to pummel the {target.name}. " \
                              f"({target.hp + target.delta_hp}/{target.max_hp})"
             enemy_message = f"The {self.name} bashes into you."
         else:
@@ -347,6 +376,7 @@ class Enemy(Actor, ABC):
         super().__init__(tile, map, scene)
         self._drop = self.DROP
         self._xp = self.XP
+        self._mode = EnemyMode.WANDER
         self._floor.entities.append(self)
 
     @property
@@ -354,6 +384,36 @@ class Enemy(Actor, ABC):
         return self._drop
 
     def ai_behavior(self):
+        if self.in_range(self.scene.player) and self.visible_to(self.scene.player):
+            self._mode = EnemyMode.ATTACK
+        else:
+            self._mode = EnemyMode.WANDER
+        if self._mode == EnemyMode.ATTACK:
+            all_neighbors = [neighbor for neighbor in self.position.neighbors]
+            all_neighbors.extend([neighbor for neighbor in self.position.diagonal_neighbors])
+            if self.scene.player.position in all_neighbors and self.in_range(self.scene.player):
+                self.bump(self.scene.player)
+            else:
+                path_to_target = [point for point in self.position.points_bresenham_to(self.scene.player.position)]
+                try:
+                    dest = path_to_target[1]
+                except IndexError:
+                    self.turn()
+                    return True
+
+                if self.map.floor.cell(dest).open:
+                    self.actor_move(dest - self.position)
+                else:
+                    try:
+                        dest = self.scene.player.position.get_closest_point([neighbor for neighbor in all_neighbors
+                                                                            if self.map.floor.cell(neighbor).open])
+                        self.actor_move(dest - self.position)
+                    except IndexError:
+                        pass
+        elif self._mode == EnemyMode.WANDER:
+            dest = self.map.random_open_adjacent(self.position)
+            self.actor_move(dest - self.position)
+
         self.turn()
         return True
 

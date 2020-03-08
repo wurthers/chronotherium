@@ -73,7 +73,7 @@ class Tile(Cell, ABC):
 
     @property
     def block_sight(self):
-        return self._block_sight or any(entity.type.value == 'enemy' for entity in self.entities)
+        return self._block_sight
 
     @property
     def occupied(self):
@@ -90,6 +90,7 @@ class Tile(Cell, ABC):
 class Empty(Tile):
     OPEN = False
     BLOCK = True
+    BLOCK_SIGHT = True
     TERRAIN = Terrain.EMPTY
 
 
@@ -145,6 +146,7 @@ class Door(Tile):
     COLOR = Color.CYAN
     OPEN = False
     BLOCK = True
+    BLOCK_SIGHT = True
     TERRAIN = Terrain.DOOR
 
     def __init__(self, point):
@@ -165,6 +167,10 @@ class Door(Tile):
     @property
     def block(self):
         return self._block or any(entity.blocking for entity in self.entities)
+
+    @property
+    def block_sight(self):
+        return self._block
 
     @property
     def door_open(self):

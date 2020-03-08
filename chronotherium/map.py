@@ -87,11 +87,11 @@ class Floor(TileMap):
 
     def connect_tiles(self, tile1: Tile, tile2: Tile, doors: bool = True, manhattan: bool = False):
         origin = tile1.point
-        dest_neighbors = [point for point in tile2.point.neighbors]
-        dest = origin.get_closest_point(dest_neighbors)
+        dest = origin.get_closest_point([neighbor for neighbor in tile2.point.neighbors])
         self.hallway_tile(origin, doors)
         for point in origin.path_L_to(dest):
             self.hallway_tile(point, doors)
+        self.hallway_tile(dest, doors)
 
     def hallway_tile(self, point, doors=True):
         if isinstance(self.cell(point), Wall):
@@ -106,23 +106,25 @@ class Floor(TileMap):
             tile = FloorTile(point)
         self.set_cell(tile)
 
-    def connect_nodes(self, node1: BSPNode, node2: BSPNode):
-        room1 = node1.data.get('room')
-        room2 = node2.data.get('room')
-        if room1 and room2:
-            self.create_hallway(room1, room2, horiz=node1.is_horz)
-        elif not node1.data.get('connected_to_sibling') and not not node2.data.get('connected_to_sibling'):
-            halls = randint(1, 4)
-            for i in range(0, halls):
-                tile1 = self.cell(self.find_open_point(rect=node1.rect))
-                tile2 = self.cell(self.find_open_point(rect=node1.rect))
-                self.connect_tiles(tile1, tile2)
-        node1.data['connected_to_sibling'] = True
-        node2.data['connected_to_sibling'] = True
-        parent1 = node1.parent_weakref()
-        parent2 = node2.parent_weakref()
-        if parent1 and parent2:
-            self.connect_nodes(parent1, parent2)
+    def connect_nodes(self, node1: BSPNode, node2: BSPNode, connect_parents: bool = False):
+        if not node1.data.get('connected_to_sibling') or not node2.data.get('connected_to_sibling'):
+            room1 = node1.data.get('room')
+            room2 = node2.data.get('room')
+            if room1 and room2:
+                self.create_hallway(room1, room2, horiz=node1.is_horz)
+            else:
+                halls = randint(2, 4)
+                for i in range(0, halls):
+                    tile1 = self.cell(self.find_open_point(rect=node1.rect.with_inset(1)))
+                    tile2 = self.cell(self.find_open_point(rect=node1.rect.with_inset(1)))
+                    self.connect_tiles(tile1, tile2)
+            node1.data['connected_to_sibling'] = True
+            node2.data['connected_to_sibling'] = True
+        if connect_parents:
+            parent1 = node1.parent_weakref()
+            parent2 = node2.parent_weakref()
+            if parent1 and parent2:
+                self.connect_nodes(parent1, parent2)
 
     def generate(self):
         rooms = []
@@ -136,6 +138,9 @@ class Floor(TileMap):
 
         for siblings in self.bsp_tree.root.sibling_pairs:
             self.connect_nodes(*siblings)
+
+        for leaf in self.bsp_tree.root.leaves:
+            self.connect_nodes(leaf, next(self.bsp_tree.root.leaves), connect_parents=True)
 
     def create_hallway(self, room1: Rect, room2: Rect, horiz=False) -> None:
 
@@ -229,11 +234,11 @@ class Floor(TileMap):
 
 class Map:
 
-    FLOORS = 5
+    FLOORS = 6
     FLOOR_SIZE = MAP_SIZE
     VIEW_SIZE = VIEW_SIZE
     ORIGIN = MAP_ORIGIN
-    ENEMY_DENSITY = 30
+    ENEMY_DENSITY = 25
 
     __enemies = [Golem, Sentry, Knight]
 
@@ -305,8 +310,29 @@ class Map:
         floor.stairs_up = stairs_up
         dest_floor.stairs_down = stairs_down
 
+    def random_open_adjacent(self, point):
+        neighbors = []
+        for neighbor in point.neighbors:
+            try:
+                if self.floor.cell(neighbor).open:
+                    neighbors.append(neighbor)
+            except CellOutOfBoundsError:
+                pass
+        for neighbor in point.diagonal_neighbors:
+            try:
+                if self.floor.cell(neighbor).open:
+                    neighbors.append(neighbor)
+            except CellOutOfBoundsError:
+                pass
+        if len(neighbors) > 0:
+            return neighbors[randrange(0, len(neighbors))]
+        else:
+            return point
+
     def closest_open_point(self, point: Point) -> Point:
-        neighbors = point.neighbors
+        neighbors = [neighbor for neighbor in point.neighbors]
+        neighbors.extend([neighbor for neighbor in point.diagonal_neighbors])
+
         found = None
         for neighbor in neighbors:
             if self.floor.cell(neighbor).open:
@@ -342,6 +368,12 @@ class Map:
             return self.__floors[index]
         else:
             raise IndexError("Attempted to get a floor that doesn't exist!")
+
+    def get_allows_light(self, point):
+        try:
+            return not self.floor.cell(point).block_sight
+        except CellOutOfBoundsError:
+            return False
 
     @property
     def floor(self):
