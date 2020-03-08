@@ -3,10 +3,13 @@ from random import randint, randrange
 from logging import getLogger
 
 from chronotherium.entities.chronotherium import Chronotherium
+from chronotherium.entities.golem import Golem
+from chronotherium.entities.sentry import Sentry
+from chronotherium.entities.knight import Knight
 from chronotherium.entities.player import Player
 from clubsandwich.geom import Point, Size, Rect
 from clubsandwich.tilemap import TileMap, CellOutOfBoundsError
-from clubsandwich.generators import RandomBSPTree
+from clubsandwich.generators import RandomBSPTree, BSPNode
 
 from chronotherium.tiles.tile import Tile, Empty, FloorTile, Wall, Orientation, StairsUp, StairsDown, Door
 from chronotherium.window import MAP_SIZE, VIEW_SIZE, MAP_ORIGIN
@@ -19,11 +22,11 @@ logger = getLogger()
 
 class Floor(TileMap):
 
-    LEAF_MIN = 4
-    ROOM_MIN = 4
+    LEAF_MIN = 6
+    ROOM_MIN = 5
     ROOM_MAX = 7
 
-    def __init__(self, origin: Point, size, variance=0):
+    def __init__(self, origin: Point, size: Size):
         super().__init__(size, cell_class=Empty)
         self.size = size
         self.entities = []
@@ -82,22 +85,44 @@ class Floor(TileMap):
         open_tiles = self.get_open_tiles(rect=rect)
         return open_tiles[randrange(0, len(open_tiles))].point
 
-    def connect_tiles(self, tile1: Tile, tile2: Tile, doors: bool = True):
+    def connect_tiles(self, tile1: Tile, tile2: Tile, doors: bool = True, manhattan: bool = False):
         origin = tile1.point
         dest_neighbors = [point for point in tile2.point.neighbors]
         dest = origin.get_closest_point(dest_neighbors)
-        for point in origin.points_bresenham_to(dest):
-            if isinstance(self.cell(point), Wall):
-                if doors:
-                    tile = Door(point)
-                else:
-                    if isinstance(self.cell(point), Door):
-                        return
-                    else:
-                        tile = FloorTile(point)
+        self.hallway_tile(origin, doors)
+        for point in origin.path_L_to(dest):
+            self.hallway_tile(point, doors)
+
+    def hallway_tile(self, point, doors=True):
+        if isinstance(self.cell(point), Wall):
+            if doors:
+                tile = Door(point)
             else:
-                tile = FloorTile(point)
-            self.set_cell(tile)
+                if isinstance(self.cell(point), Door):
+                    return
+                else:
+                    tile = FloorTile(point)
+        else:
+            tile = FloorTile(point)
+        self.set_cell(tile)
+
+    def connect_nodes(self, node1: BSPNode, node2: BSPNode):
+        room1 = node1.data.get('room')
+        room2 = node2.data.get('room')
+        if room1 and room2:
+            self.create_hallway(room1, room2, horiz=node1.is_horz)
+        elif not node1.data.get('connected_to_sibling') and not not node2.data.get('connected_to_sibling'):
+            halls = randint(1, 4)
+            for i in range(0, halls):
+                tile1 = self.cell(self.find_open_point(rect=node1.rect))
+                tile2 = self.cell(self.find_open_point(rect=node1.rect))
+                self.connect_tiles(tile1, tile2)
+        node1.data['connected_to_sibling'] = True
+        node2.data['connected_to_sibling'] = True
+        parent1 = node1.parent_weakref()
+        parent2 = node2.parent_weakref()
+        if parent1 and parent2:
+            self.connect_nodes(parent1, parent2)
 
     def generate(self):
         rooms = []
@@ -110,53 +135,34 @@ class Floor(TileMap):
             self.place_room(room)
 
         for siblings in self.bsp_tree.root.sibling_pairs:
-            try:
-                room1 = siblings[0].data.get('room')
-                room2 = siblings[1].data.get('room')
-                if room1 and room2:
-                    self.create_hallway(room1, room2, horiz=siblings[0].is_horz)
-            except KeyError as err:
-                pass
+            self.connect_nodes(*siblings)
 
     def create_hallway(self, room1: Rect, room2: Rect, horiz=False) -> None:
-        print("INSIDE CREATE HALLWAY")
-        tile1 = self.cell(room1.get_random_point())
-        tile2 = self.cell(room2.get_random_point())
-        self.connect_tiles(tile1, tile2)
 
-        starting_point = next(tile1.point.points_bresenham_to(tile2.point))
-        if horiz:
-            deltas = (Point(-1, 0), Point(1, 0))
-        else:
-            deltas = (Point(0, -1), Point(0, 1))
-
-        room1_neighbors = []
-        room2_neighbors = []
-
-        try:
-            room1_neighbors.append(self.cell(tile1.point + deltas[0]))
-        except CellOutOfBoundsError:
-            pass
-
-        try:
-            room1_neighbors.append(self.cell(tile1.point + deltas[1]))
-        except CellOutOfBoundsError:
-            pass
-
-        try:
-            room2_neighbors.append(self.cell(tile2.point + deltas[0]))
-        except CellOutOfBoundsError:
-            pass
-
-        try:
-            room2_neighbors.append(self.cell(tile2.point + deltas[1]))
-        except CellOutOfBoundsError:
-            pass
-
-        if len(room1_neighbors) > 0 and len(room2_neighbors) > 0:
-            self.connect_tiles(room1_neighbors[0], room2_neighbors[0], doors=False)
-        if len(room1_neighbors) > 1 and len(room2_neighbors) > 1:
-            self.connect_tiles(room1_neighbors[1], room2_neighbors[1], doors=False)
+        halls = randint(1, 3)
+        for i in range(0, halls):
+            if not horiz:
+                top = [point for point in room1.points_top]
+                edge_point = top[randrange(0, len(top))]
+                closest_point = edge_point.get_closest_point([p for p in room2.points])
+                if room2.contains(next(edge_point.path_L_to(closest_point))):
+                    bottom = [point for point in room1.points_bottom]
+                    edge_point = bottom[randrange(0, len(bottom))]
+                    closest_point = edge_point.get_closest_point([p for p in room2.points])
+                edge_tile = self.cell(edge_point)
+                closest_tile = self.cell(closest_point)
+                self.connect_tiles(edge_tile, closest_tile, manhattan=True)
+            else:
+                right = [point for point in room1.points_right]
+                edge_point = right[randrange(0, len(right))]
+                closest_point = edge_point.get_closest_point([p for p in room2.points])
+                if room2.contains(next(edge_point.path_L_to(closest_point))):
+                    left = [point for point in room1.points_left]
+                    edge_point = left[randrange(0, len(left))]
+                    closest_point = edge_point.get_closest_point([p for p in room2.points])
+                edge_tile = self.cell(edge_point)
+                closest_tile = self.cell(closest_point)
+                self.connect_tiles(edge_tile, closest_tile, manhattan=True)
 
     def get_rect(self) -> Rect:
         width = randint(self.room_min, self.room_max)
@@ -227,6 +233,9 @@ class Map:
     FLOOR_SIZE = MAP_SIZE
     VIEW_SIZE = VIEW_SIZE
     ORIGIN = MAP_ORIGIN
+    ENEMY_DENSITY = 30
+
+    __enemies = [Golem, Sentry, Knight]
 
     def __init__(self, scene: 'GameScene'):
 
@@ -246,7 +255,8 @@ class Map:
 
         for i in range(0, self.FLOORS):
             self.__floors[i] = Floor(self._origin, self._floor_size)
-            self.populate_floor(self.__floors[i])
+            density = self.ENEMY_DENSITY - 2 * i
+            self.populate_floor(self.__floors[i], density)
 
         for index in self.__floors:
             floor = self.__floors.get(index + 1)
@@ -257,7 +267,8 @@ class Map:
             if floor.stairs_down and floor.stairs_up:
                 floor.connect_tiles(floor.stairs_down, floor.stairs_up)
 
-        player_start_tile = self.floor.cell(self.floor.find_open_point())
+        player_start_tile = self.floor.cell(self.floor.stairs_up.point.
+                                            get_farthest_point([tile.point for tile in self.floor.get_open_tiles()]))
         self.player = Player(player_start_tile, self, self.scene)
         self.floor.connect_tiles(player_start_tile, self.floor.stairs_up)
 
@@ -266,18 +277,22 @@ class Map:
         Chronotherium(chronotherium_start_tile, self, self.scene)
         last_floor.connect_tiles(chronotherium_start_tile, last_floor.stairs_down)
 
-    def populate_floor(self, floor, enemy_density=None):
-        enemy_density = enemy_density or {}
-        for enemy, density in enemy_density.items():
-
-            point = floor.find_open_point()
-            enemy(point, self, self.scene)
+    def populate_floor(self, floor, density):
+        total_enemies = int(len(floor.get_open_tiles()) / density)
+        for enemy in self.__enemies:
+            for i in range(0, int(total_enemies / len(self.__enemies))):
+                tile = floor.cell(floor.find_open_point())
+                enemy(tile, self, self.scene)
 
     def place_stairs(self, floor_index, dest_floor_index):
         floor = self.__floors[floor_index]
         dest_floor = self.__floors[dest_floor_index]
 
-        stairs_point = floor.find_open_point()
+        if floor.stairs_down:
+            stairs_point = floor.stairs_down.point.\
+                get_farthest_point([tile.point for tile in self.floor.get_open_tiles()])
+        else:
+            stairs_point = floor.find_open_point()
         dest_point = dest_floor.find_open_point()
 
         stairs_up = StairsUp(stairs_point)

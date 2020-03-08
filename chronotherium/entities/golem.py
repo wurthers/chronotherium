@@ -15,9 +15,6 @@ class Golem(Enemy):
     COLOR = Color.VIOLET
     DROP = TimePotion
 
-    def ai_behavior(self):
-        pass
-
     def drain_tp(self):
         # Wander around generally towards the player, firing a drain tp spell every turn
         pass

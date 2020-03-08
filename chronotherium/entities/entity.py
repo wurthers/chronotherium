@@ -354,6 +354,7 @@ class Enemy(Actor, ABC):
         return self._drop
 
     def ai_behavior(self):
+        self.turn()
         return True
 
     def drop_item(self):
