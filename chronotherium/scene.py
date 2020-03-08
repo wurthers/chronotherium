@@ -9,7 +9,6 @@ from clubsandwich.director import Scene
 from chronotherium.window import Window, Color, LOG_HEIGHT
 from chronotherium.map import Map
 from chronotherium.entities.entity import Actor, ActorState, EntityType
-from chronotherium.entities.player import Player
 from chronotherium.input import Input
 from chronotherium.time import Time
 
@@ -132,7 +131,13 @@ class FlavorScene(PrintScene):
         super().__init__()
 
     def terminal_update(self, is_active: bool = False):
-        self.pprint_center(["Flavor goes here!", "- Space -"])
+        self.pprint_center(["You return to the Palace in an entirely",
+                            "new WHEN that feels all to familiar.",
+                            "The time beast has once again thwarted you,",
+                            "as it has done many times before.",
+                            "How long have you pursued it through these halls,",
+                            "subdividing time into seconds proceeding by your will alone?",
+                            "(Space to Continue)"])
 
     def terminal_read(self, val):
         try:

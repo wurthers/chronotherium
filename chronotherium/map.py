@@ -19,9 +19,9 @@ logger = getLogger()
 
 class Floor(TileMap):
 
-    LEAF_MIN = 5
+    LEAF_MIN = 4
     ROOM_MIN = 4
-    ROOM_MAX = 8
+    ROOM_MAX = 7
 
     def __init__(self, origin: Point, size, variance=0):
         super().__init__(size, cell_class=Empty)
@@ -82,13 +82,19 @@ class Floor(TileMap):
         open_tiles = self.get_open_tiles(rect=rect)
         return open_tiles[randrange(0, len(open_tiles))].point
 
-    def connect_tiles(self, tile1, tile2):
+    def connect_tiles(self, tile1: Tile, tile2: Tile, doors: bool = True):
         origin = tile1.point
         dest_neighbors = [point for point in tile2.point.neighbors]
         dest = origin.get_closest_point(dest_neighbors)
         for point in origin.points_bresenham_to(dest):
             if isinstance(self.cell(point), Wall):
-                tile = Door(point)
+                if doors:
+                    tile = Door(point)
+                else:
+                    if isinstance(self.cell(point), Door):
+                        return
+                    else:
+                        tile = FloorTile(point)
             else:
                 tile = FloorTile(point)
             self.set_cell(tile)
@@ -96,19 +102,61 @@ class Floor(TileMap):
     def generate(self):
         rooms = []
         for leaf in self.bsp_tree.root.leaves:
-            room = self.create_bounded_rect(leaf.rect)
+            room = leaf.rect.get_random_rect(min_size=Size(self.room_min, self.room_min))
             leaf.data['room'] = room
             leaf.data['connected_to_sibling'] = False
             rooms.append(room)
         for room in rooms:
             self.place_room(room)
 
-    def create_bounded_rect(self, rect: Rect) -> Rect:
-        width = randint(self.room_min, rect.width)
-        height = randint(self.room_min, rect.height)
-        origin_x = randint(rect.origin.x, rect.origin.x + rect.width - width)
-        origin_y = randint(rect.origin.y, rect.origin.y + rect.height - height)
-        return Rect(Point(origin_x, origin_y), Size(width, height))
+        for siblings in self.bsp_tree.root.sibling_pairs:
+            try:
+                room1 = siblings[0].data.get('room')
+                room2 = siblings[1].data.get('room')
+                if room1 and room2:
+                    self.create_hallway(room1, room2)
+            except KeyError as err:
+                pass
+
+    def create_hallway(self, room1: Rect, room2: Rect) -> None:
+        print("INSIDE CREATE HALLWAY")
+        tile1 = self.cell(room1.get_random_point())
+        tile2 = self.cell(room2.get_random_point())
+        self.connect_tiles(tile1, tile2)
+
+        starting_point = next(tile1.point.points_bresenham_to(tile2.point))
+        if tile1.point.y - starting_point.y == 0:
+            deltas = (Point(-1, 0), Point(1, 0))
+        else:
+            deltas = (Point(0, -1), Point(0, 1))
+
+        room1_neighbors = []
+        room2_neighbors = []
+
+        try:
+            room1_neighbors.append(self.cell(tile1.point + deltas[0]))
+        except CellOutOfBoundsError:
+            pass
+
+        try:
+            room1_neighbors.append(self.cell(tile1.point + deltas[1]))
+        except CellOutOfBoundsError:
+            pass
+
+        try:
+            room2_neighbors.append(self.cell(tile2.point + deltas[0]))
+        except CellOutOfBoundsError:
+            pass
+
+        try:
+            room2_neighbors.append(self.cell(tile2.point + deltas[1]))
+        except CellOutOfBoundsError:
+            pass
+
+        if len(room1_neighbors) > 0 and len(room2_neighbors) > 0:
+            self.connect_tiles(room1_neighbors[0], room2_neighbors[0], doors=False)
+        if len(room1_neighbors) > 1 and len(room2_neighbors) > 1:
+            self.connect_tiles(room1_neighbors[1], room2_neighbors[1], doors=False)
 
     def get_rect(self) -> Rect:
         width = randint(self.room_min, self.room_max)
@@ -116,41 +164,37 @@ class Floor(TileMap):
         origin = self.find_empty_point()
         return Rect(origin, Size(width, height))
 
-    def make_room(self):
-        room = self.get_rect()
-        self.place_room(room)
-
-    def place_wall(self, point: Point, orientation: Orientation):
-        if self.area.contains(point):
-            if isinstance(self.cell(point), Empty):
-                self.set_cell(Wall(point, orientation))
-            elif isinstance(self.cell(point), Wall):
-                try:
-                    corner_map = {
-                        (Point(-1, 0), Point(0, -1)): Orientation.BOTTOM_RIGHT,
-                        (Point(0, -1), Point(1, 0)): Orientation.BOTTOM_LEFT,
-                        (Point(1, 0), Point(0, 1)): Orientation.TOP_LEFT,
-                        (Point(0, 1), Point(-1, 0)): Orientation.TOP_RIGHT,
-                    }
-                    left_point, up_point, right_point, down_point = point.neighbors
-                    neighbor_tiles = {
-                        left_point: self.cell(left_point),
-                        up_point: self.cell(up_point),
-                        right_point: self.cell(right_point),
-                        down_point: self.cell(down_point)
-                    }
-                    floors = [point for point in neighbor_tiles if isinstance(neighbor_tiles[point], FloorTile)]
-                    walls = [point for point in neighbor_tiles if isinstance(neighbor_tiles[point], Wall)]
-                    if len(floors) == 2 and len(walls) == 2:
-                        wall_deltas = (walls[0] - point, walls[1] - point)
-                        try:
-                            orientation = corner_map[wall_deltas]
-                        except KeyError:
-                            return
-                        self.set_cell(Wall(point, orientation))
-
-                except CellOutOfBoundsError:
-                    pass
+    # def place_wall(self, point: Point, orientation: Orientation):
+    #     if self.area.contains(point):
+    #         if isinstance(self.cell(point), Empty):
+    #             self.set_cell(Wall(point, orientation))
+    #         elif isinstance(self.cell(point), Wall):
+    #             try:
+    #                 corner_map = {
+    #                     (Point(-1, 0), Point(0, -1)): Orientation.BOTTOM_RIGHT,
+    #                     (Point(0, -1), Point(1, 0)): Orientation.BOTTOM_LEFT,
+    #                     (Point(1, 0), Point(0, 1)): Orientation.TOP_LEFT,
+    #                     (Point(0, 1), Point(-1, 0)): Orientation.TOP_RIGHT,
+    #                 }
+    #                 left_point, up_point, right_point, down_point = point.neighbors
+    #                 neighbor_tiles = {
+    #                     left_point: self.cell(left_point),
+    #                     up_point: self.cell(up_point),
+    #                     right_point: self.cell(right_point),
+    #                     down_point: self.cell(down_point)
+    #                 }
+    #                 floors = [point for point in neighbor_tiles if isinstance(neighbor_tiles[point], FloorTile)]
+    #                 walls = [point for point in neighbor_tiles if isinstance(neighbor_tiles[point], Wall)]
+    #                 if len(floors) == 2 and len(walls) == 2:
+    #                     wall_deltas = (walls[0] - point, walls[1] - point)
+    #                     try:
+    #                         orientation = corner_map[wall_deltas]
+    #                     except KeyError:
+    #                         return
+    #                     self.set_cell(Wall(point, orientation))
+    #
+    #             except CellOutOfBoundsError:
+    #                 pass
 
     def place_room(self, room: Rect, no_floor: bool = False):
         if not no_floor:
@@ -158,17 +202,17 @@ class Floor(TileMap):
                 self.set_cell(FloorTile(point))
 
         for point in room.points_top:
-            self.place_wall(point, Orientation.HORIZONTAL)
+            self.set_cell(Wall(point, Orientation.HORIZONTAL))
         for point in room.points_bottom:
-            self.place_wall(point, Orientation.HORIZONTAL)
+            self.set_cell(Wall(point, Orientation.HORIZONTAL))
         for point in room.points_left:
-            self.place_wall(point, Orientation.VERTICAL)
+            self.set_cell(Wall(point, Orientation.VERTICAL))
         for point in room.points_right:
-            self.place_wall(point, Orientation.VERTICAL)
-        self.place_wall(room.origin, Orientation.TOP_LEFT)
-        self.place_wall(room.point_top_right, Orientation.TOP_RIGHT)
-        self.place_wall(room.point_bottom_right, Orientation.BOTTOM_RIGHT)
-        self.place_wall(room.point_bottom_left, Orientation.BOTTOM_LEFT)
+            self.set_cell(Wall(point, Orientation.VERTICAL))
+        self.set_cell(Wall(room.origin, Orientation.TOP_LEFT))
+        self.set_cell(Wall(room.point_top_right, Orientation.TOP_RIGHT))
+        self.set_cell(Wall(room.point_bottom_right, Orientation.BOTTOM_RIGHT))
+        self.set_cell(Wall(room.point_bottom_left, Orientation.BOTTOM_LEFT))
 
     def bounds_room(self):
         for point in self.area.points:
