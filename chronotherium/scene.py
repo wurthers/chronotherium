@@ -140,7 +140,8 @@ class FlavorScene(PrintScene):
                             "but it feels feels all too familiar.", "",
                             "The beast has thwarted you once again,",
                             "as it has done so many times before.",
-                            "How long have you pursued it through these halls?", "",
+                            "How long have you pursued",
+                            "it through these halls?", "",
                             "How many countless seconds,",
                             "subdividing eternity?", "",
                             "(Press Space to Continue)"])

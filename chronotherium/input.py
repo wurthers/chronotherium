@@ -78,17 +78,17 @@ class Input:
         self.time = Time()
 
         self.__command_map = {
-            Command.RANGED: self.ranged,
+            # Command.RANGED: self.ranged,
             Command.REWIND: self.rewind,
-            Command.HURT: self.hurt_player,
-            Command.DRAIN: self.drain_player,
-            Command.GAIN: self.gain_xp,
+            # Command.HURT: self.hurt_player,
+            # Command.DRAIN: self.drain_player,
+            # Command.GAIN: self.gain_xp,
             Command.PUSH: self.push,
             Command.DIAGONAL: self.diagonal,
             Command.FREEZE: self.freeze,
             Command.PICKUP: self.pickup,
             Command.PICKUP_G: self.pickup,
-            Command.LOOK: self.look,
+            # Command.LOOK: self.look,
             Command.OPEN: self.open,
             Command.TELEPORT: self.teleport
         }
@@ -279,6 +279,7 @@ class Input:
                     # +1 -- Account for this current turn
                     enemy.freeze(turns + 2)
                     enemy.delta_hp -= self.player.freeze_damage
+                    enemy.update_hp()
                     self.scene.log(f'You freeze the {enemy.name} in suspended animation. {enemy.hp}/{enemy.max_hp}')
                     return True
                 else:

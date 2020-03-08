@@ -40,8 +40,8 @@ class Color:
 
 
 TITLE = "Chronotherium - 2020 7DRL"
-WINDOW_WIDTH = 50
-WINDOW_HEIGHT = 42
+WINDOW_WIDTH = 46
+WINDOW_HEIGHT = 32
 ENCODING = 'utf-8'
 SPACING = '1x1'
 FONT = resource_path(os.path.join(RESOURCE_PATH, 'VeraMono.ttf'))
