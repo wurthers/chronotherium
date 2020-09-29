@@ -8,7 +8,7 @@ import os
 
 
 if getattr(sys, 'frozen', False):
-    RESOURCE_PATH = './'
+    RESOURCE_PATH = ''
 else:
     RESOURCE_PATH = '../resources'
 
