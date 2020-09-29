@@ -265,11 +265,6 @@ class Actor(Entity, ABC):
         self.update_tp()
         self.update_xp()
         if self.frozen > 0:
-            self.frozen -= 1
-            if self.frozen == 0:
-                self.scene.log(f'The {self.name} thaws.')
-            else:
-                self.scene.log(f'The {self.name} is stuck in time.')
             return
         else:
             self.update_pos()
@@ -404,41 +399,49 @@ class Enemy(Actor, ABC):
         return self._drop_chance
 
     def ai_behavior(self):
-        if self._mode == EnemyMode.STUNNED:
-            self._mode = EnemyMode.WANDER
-            return False
-        if self.in_range(self.scene.player) and self.visible_to(self.scene.player):
-            self._mode = EnemyMode.ATTACK
-        else:
-            self._mode = EnemyMode.WANDER
-        if self._mode == EnemyMode.ATTACK:
-            all_neighbors = [neighbor for neighbor in self.position.neighbors]
-            all_neighbors.extend([neighbor for neighbor in self.position.diagonal_neighbors])
-            if self.scene.player.position in all_neighbors and self.in_range(self.scene.player):
-                self.bump(self.scene.player)
+        if self.frozen <= 0:
+            if self._mode == EnemyMode.STUNNED:
+                self._mode = EnemyMode.WANDER
+                return False
+            if self.in_range(self.scene.player) and self.visible_to(self.scene.player):
+                self._mode = EnemyMode.ATTACK
             else:
-                path_to_target = [point for point in self.position.points_bresenham_to(self.scene.player.position)]
-                try:
-                    dest = path_to_target[1]
-                except IndexError:
-                    self.turn()
-                    return True
-
-                if self.map.floor.cell(dest).open:
-                    self.actor_move(dest - self.position)
+                self._mode = EnemyMode.WANDER
+            if self._mode == EnemyMode.ATTACK:
+                all_neighbors = [neighbor for neighbor in self.position.neighbors]
+                all_neighbors.extend([neighbor for neighbor in self.position.diagonal_neighbors])
+                if self.scene.player.position in all_neighbors and self.in_range(self.scene.player):
+                    self.bump(self.scene.player)
                 else:
+                    path_to_target = [point for point in self.position.points_bresenham_to(self.scene.player.position)]
                     try:
-                        dest = self.scene.player.position\
-                            .get_closest_point([neighbor for neighbor in all_neighbors
-                                                if self.map.floor.cell(neighbor).open])
-                        self.actor_move(dest - self.position)
+                        dest = path_to_target[1]
                     except IndexError:
-                        pass
-        elif self._mode == EnemyMode.WANDER:
-            dest = self.map.random_open_adjacent(self.position)
-            self.actor_move(dest - self.position)
+                        self.turn()
+                        return True
+
+                    if self.map.floor.cell(dest).open:
+                        self.actor_move(dest - self.position)
+                    else:
+                        try:
+                            dest = self.scene.player.position\
+                                .get_closest_point([neighbor for neighbor in all_neighbors
+                                                    if self.map.floor.cell(neighbor).open])
+                            self.actor_move(dest - self.position)
+                        except IndexError:
+                            pass
+            elif self._mode == EnemyMode.WANDER:
+                dest = self.map.random_open_adjacent(self.position)
+                self.actor_move(dest - self.position)
 
         self.turn()
+
+        if self.frozen > 0:
+            self.frozen -= 1
+            if self.frozen == 0:
+                self.scene.log(f'The {self.name} thaws.')
+            else:
+                self.scene.log(f'The {self.name} is stuck in time.')
         return True
 
     def drop_item(self):

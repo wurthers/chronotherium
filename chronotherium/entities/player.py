@@ -110,11 +110,13 @@ class Player(Actor):
         self._found_boss = False
 
     def turn(self):
-        if self.hp < self.max_hp:
+        if self.hp < self.max_hp or self.tp < self.max_tp:
             self._heal_clock += 1
             if self._heal_clock % self._heal_rate == 0:
-                self.delta_hp += 1
-                self.delta_tp += 1
+                if self.hp < self.max_hp:
+                    self.delta_hp += 1
+                if self.tp < self.max_tp:
+                    self.delta_tp += 1
                 self._heal_clock = 0
         super().turn()
 
